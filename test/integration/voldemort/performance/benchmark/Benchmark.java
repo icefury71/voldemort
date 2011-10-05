@@ -58,6 +58,7 @@ import voldemort.xml.StoreDefinitionsMapper;
 public class Benchmark {
 
     private static final int MAX_WORKERS = 8;
+    private static final int ONE_KB = 1024 * 1024;
 
     /**
      * Constants for the benchmark file
@@ -80,6 +81,7 @@ public class Benchmark {
     public static final String IGNORE_NULLS = "ignore-nulls";
     public static final String REQUEST_FILE = "request-file";
     public static final String START_KEY_INDEX = "start-key-index";
+    public static final String SOCKET_BUFFER_SIZE = "socket-buffer-size";
 
     public static final String READS = "r";
     public static final String WRITES = "w";
@@ -328,11 +330,14 @@ public class Benchmark {
 
             String socketUrl = benchmarkProps.getString(URL);
             String storeName = benchmarkProps.getString(STORE_NAME);
+            int socketBufferSize = benchmarkProps.getInt(SOCKET_BUFFER_SIZE, 64);
 
             ClientConfig clientConfig = new ClientConfig().setMaxThreads(numThreads)
                                                           .setMaxTotalConnections(numThreads)
                                                           .setMaxConnectionsPerNode(numThreads)
-                                                          .setBootstrapUrls(socketUrl);
+                                                          .setBootstrapUrls(socketUrl)
+                                                          .setSocketBufferSize(socketBufferSize
+                                                                               * ONE_KB);
 
             if(clientZoneId >= 0) {
                 clientConfig.setClientZoneId(clientZoneId);
@@ -569,6 +574,8 @@ public class Benchmark {
               .describedAs("count")
               .ofType(Integer.class);
         parser.accepts(URL, "for remote tests; url of remote server").withRequiredArg();
+        parser.accepts(SOCKET_BUFFER_SIZE, "Client socket buffer size (in KB) to use")
+              .withRequiredArg();
         parser.accepts(STORE_NAME, "for remote tests; store name on the remote " + URL)
               .withRequiredArg()
               .describedAs("name");
@@ -612,9 +619,8 @@ public class Benchmark {
                 mainProps.put(REQUEST_FILE, (String) options.valueOf(REQUEST_FILE));
                 mainProps.put(RECORD_SELECTION, FILE_RECORD_SELECTION);
             } else {
-                mainProps.put(RECORD_SELECTION, CmdUtils.valueOf(options,
-                                                                 RECORD_SELECTION,
-                                                                 UNIFORM_RECORD_SELECTION));
+                mainProps.put(RECORD_SELECTION,
+                              CmdUtils.valueOf(options, RECORD_SELECTION, UNIFORM_RECORD_SELECTION));
             }
 
             if(options.has(RECORD_COUNT)) {
@@ -641,6 +647,10 @@ public class Benchmark {
                               CmdUtils.valueOf(options,
                                                STORAGE_CONFIGURATION_CLASS,
                                                BdbStorageConfiguration.class.getName()));
+            }
+
+            if(options.has(SOCKET_BUFFER_SIZE)) {
+                mainProps.put(SOCKET_BUFFER_SIZE, (String) options.valueOf(SOCKET_BUFFER_SIZE));
             }
 
             mainProps.put(VERBOSE, getCmdBoolean(options, VERBOSE));
