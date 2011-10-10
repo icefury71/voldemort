@@ -58,7 +58,7 @@ import voldemort.xml.StoreDefinitionsMapper;
 public class Benchmark {
 
     private static final int MAX_WORKERS = 8;
-    private static final int ONE_KB = 1024 * 1024;
+    private static final int ONE_KB = 1024;
 
     /**
      * Constants for the benchmark file
