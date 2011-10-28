@@ -33,6 +33,8 @@ import voldemort.client.ClientConfig;
 import voldemort.client.SocketStoreClientFactory;
 import voldemort.client.StoreClient;
 import voldemort.client.StoreClientFactory;
+import voldemort.cluster.failuredetector.BannagePeriodFailureDetector;
+import voldemort.cluster.failuredetector.ThresholdFailureDetector;
 import voldemort.serialization.IdentitySerializer;
 import voldemort.serialization.Serializer;
 import voldemort.serialization.SerializerDefinition;
@@ -82,6 +84,7 @@ public class Benchmark {
     public static final String REQUEST_FILE = "request-file";
     public static final String START_KEY_INDEX = "start-key-index";
     public static final String SOCKET_BUFFER_SIZE = "socket-buffer-size";
+    public static final String IS_THRESHOLD_DETECTOR = "is-threshold-detector";
 
     public static final String READS = "r";
     public static final String WRITES = "w";
@@ -330,12 +333,20 @@ public class Benchmark {
 
             String socketUrl = benchmarkProps.getString(URL);
             String storeName = benchmarkProps.getString(STORE_NAME);
+            String detectorClass = ThresholdFailureDetector.class.getName();
             int socketBufferSize = benchmarkProps.getInt(SOCKET_BUFFER_SIZE, 64);
+            boolean isThresholdDetector = benchmarkProps.getBoolean(IS_THRESHOLD_DETECTOR, true);
+
+            if(!isThresholdDetector)
+                detectorClass = BannagePeriodFailureDetector.class.getName();
+
+            System.err.println("Failure detector class being used = " + detectorClass);
 
             ClientConfig clientConfig = new ClientConfig().setMaxThreads(numThreads)
                                                           .setMaxTotalConnections(numThreads)
                                                           .setMaxConnectionsPerNode(numThreads)
                                                           .setBootstrapUrls(socketUrl)
+                                                          .setFailureDetectorImplementation(detectorClass)
                                                           .setSocketBufferSize(socketBufferSize
                                                                                * ONE_KB);
 
@@ -576,6 +587,8 @@ public class Benchmark {
         parser.accepts(URL, "for remote tests; url of remote server").withRequiredArg();
         parser.accepts(SOCKET_BUFFER_SIZE, "Client socket buffer size (in KB) to use")
               .withRequiredArg();
+        parser.accepts(IS_THRESHOLD_DETECTOR, "Is failure detector type = Threshold ?")
+              .withRequiredArg();
         parser.accepts(STORE_NAME, "for remote tests; store name on the remote " + URL)
               .withRequiredArg()
               .describedAs("name");
@@ -651,6 +664,10 @@ public class Benchmark {
 
             if(options.has(SOCKET_BUFFER_SIZE)) {
                 mainProps.put(SOCKET_BUFFER_SIZE, (String) options.valueOf(SOCKET_BUFFER_SIZE));
+            }
+            if(options.has(IS_THRESHOLD_DETECTOR)) {
+                mainProps.put(IS_THRESHOLD_DETECTOR,
+                              (String) options.valueOf(IS_THRESHOLD_DETECTOR));
             }
 
             mainProps.put(VERBOSE, getCmdBoolean(options, VERBOSE));
