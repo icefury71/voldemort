@@ -17,6 +17,7 @@
 package voldemort.store.readonly;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -475,18 +476,28 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
 
     public List<Versioned<byte[]>> get(ByteArray key, byte[] transforms) throws VoldemortException {
         StoreUtils.assertValidKey(key);
+        long keyVal = ByteUtils.readLong(key.get(), 0);
+        long modKey = keyVal % 1000;
+        byte[] convertedKey = ByteBuffer.allocate(key.length()).putLong(modKey).array();
+
         try {
             fileModificationLock.readLock().lock();
-            int chunk = fileSet.getChunkForKey(key.get());
+            // int chunk = fileSet.getChunkForKey(key.get());
+            int chunk = fileSet.getChunkForKey(convertedKey);
             if(chunk < 0) {
                 logger.warn("Invalid chunk id returned. Either routing strategy is inconsistent or storage format not understood");
                 return Collections.emptyList();
             }
+            // int location =
+            // searchStrategy.indexOf(fileSet.indexFileFor(chunk),
+            // fileSet.keyToStorageFormat(key.get()),
+            // fileSet.getIndexFileSize(chunk));
             int location = searchStrategy.indexOf(fileSet.indexFileFor(chunk),
-                                                  fileSet.keyToStorageFormat(key.get()),
+                                                  fileSet.keyToStorageFormat(convertedKey),
                                                   fileSet.getIndexFileSize(chunk));
             if(location >= 0) {
-                byte[] value = fileSet.readValue(key.get(), chunk, location);
+                // byte[] value = fileSet.readValue(key.get(), chunk, location);
+                byte[] value = fileSet.readValue(convertedKey, chunk, location);
                 if(value.length == 0) {
                     return Collections.emptyList();
                 } else {
