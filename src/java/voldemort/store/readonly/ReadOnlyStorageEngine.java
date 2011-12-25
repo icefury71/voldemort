@@ -25,6 +25,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -69,6 +70,7 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
     private volatile boolean isOpen;
     private int deleteBackupMs = 0;
     private long lastSwapped;
+    private Random rand;
 
     /**
      * Create an instance of the store
@@ -124,6 +126,7 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
         this.fileModificationLock = new ReentrantReadWriteLock();
         this.isOpen = false;
         open(null);
+        rand = new Random(new Date().getTime());
     }
 
     /**
@@ -476,9 +479,11 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
 
     public List<Versioned<byte[]>> get(ByteArray key, byte[] transforms) throws VoldemortException {
         StoreUtils.assertValidKey(key);
-        long keyVal = ByteUtils.readLong(key.get(), 0);
+        long keyVal = ByteUtils.readLong(key.get(), 1);
         long modKey = keyVal % 1000;
-        byte[] convertedKey = ByteBuffer.allocate(key.length()).putLong(modKey).array();
+        byte[] cKey = ByteBuffer.allocate(key.length()).putLong(modKey).array();
+        byte[] convertedKey = new byte[9];
+        System.arraycopy(cKey, 0, convertedKey, 1, 8);
 
         try {
             fileModificationLock.readLock().lock();
@@ -486,7 +491,8 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
             int chunk = fileSet.getChunkForKey(convertedKey);
             if(chunk < 0) {
                 logger.warn("Invalid chunk id returned. Either routing strategy is inconsistent or storage format not understood");
-                return Collections.emptyList();
+                // return Collections.emptyList();
+                chunk = Math.abs(rand.nextInt()) % fileSet.getNumChunks();
             }
             // int location =
             // searchStrategy.indexOf(fileSet.indexFileFor(chunk),
