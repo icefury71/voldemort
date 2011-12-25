@@ -16,6 +16,7 @@
 
 package voldemort.store;
 
+import voldemort.server.VoldemortConfig;
 import voldemort.utils.ByteArray;
 
 /**
@@ -50,4 +51,7 @@ public interface StorageConfiguration {
      * Close the storage configuration
      */
     public void close();
+
+    public StorageEngine<ByteArray, byte[], byte[]> getStore(String name,
+                                                             VoldemortConfig voldemortConfig);
 }

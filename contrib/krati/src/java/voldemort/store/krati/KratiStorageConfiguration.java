@@ -4,6 +4,7 @@ import java.io.File;
 
 import krati.core.segment.MappedSegmentFactory;
 import krati.core.segment.SegmentFactory;
+
 import org.apache.log4j.Logger;
 
 import voldemort.server.VoldemortConfig;
@@ -63,6 +64,11 @@ public class KratiStorageConfiguration implements StorageConfiguration {
 
     public String getType() {
         return TYPE_NAME;
+    }
+
+    public StorageEngine<ByteArray, byte[], byte[]> getStore(String name,
+                                                             VoldemortConfig voldemortConfig) {
+        return null;
     }
 
 }

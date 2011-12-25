@@ -71,6 +71,7 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
     private int deleteBackupMs = 0;
     private long lastSwapped;
     private Random rand;
+    private long modValue = 1;
 
     /**
      * Create an instance of the store
@@ -93,6 +94,20 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
                                  int deleteBackupMs) {
         this(name, searchStrategy, routingStrategy, nodeId, storeDir, numBackups);
         this.deleteBackupMs = deleteBackupMs;
+    }
+
+    // For FAST benchmark
+    public ReadOnlyStorageEngine(String name,
+                                 SearchStrategy searchStrategy,
+                                 RoutingStrategy routingStrategy,
+                                 int nodeId,
+                                 File storeDir,
+                                 int numBackups,
+                                 int deleteBackupMs,
+                                 long modVal) {
+        this(name, searchStrategy, routingStrategy, nodeId, storeDir, numBackups);
+        this.deleteBackupMs = deleteBackupMs;
+        this.modValue = modVal;
     }
 
     /**
@@ -480,7 +495,8 @@ public class ReadOnlyStorageEngine implements StorageEngine<ByteArray, byte[], b
     public List<Versioned<byte[]>> get(ByteArray key, byte[] transforms) throws VoldemortException {
         StoreUtils.assertValidKey(key);
         long keyVal = ByteUtils.readLong(key.get(), 1);
-        long modKey = keyVal % 1000;
+        // long modKey = keyVal % 1000;
+        long modKey = keyVal % this.modValue;
         byte[] cKey = ByteBuffer.allocate(key.length()).putLong(modKey).array();
         byte[] convertedKey = new byte[9];
         System.arraycopy(cKey, 0, convertedKey, 1, 8);

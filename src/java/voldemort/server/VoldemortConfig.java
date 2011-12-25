@@ -91,6 +91,7 @@ public class VoldemortConfig implements Serializable {
     private String readOnlyStorageDir;
     private String readOnlySearchStrategy;
     private int readOnlyDeleteBackupTimeMs;
+    private long readOnlyModValue;
 
     private int coreThreads;
     private int maxThreads;
@@ -223,6 +224,9 @@ public class VoldemortConfig implements Serializable {
                                                                              + File.separator
                                                                              + "read-only");
         this.readOnlyDeleteBackupTimeMs = props.getInt("readonly.delete.backup.ms", 0);
+
+        // For FAST benchmark
+        this.readOnlyModValue = props.getLong("readonly.mod.value", 1);
 
         this.mysqlUsername = props.getString("mysql.user", "root");
         this.mysqlPassword = props.getString("mysql.password", "");
@@ -1117,6 +1121,15 @@ public class VoldemortConfig implements Serializable {
 
     public void setReadOnlyBackups(int readOnlyBackups) {
         this.readOnlyBackups = readOnlyBackups;
+    }
+
+    // For FAST benchmark
+    public long getReadOnlyModValue() {
+        return readOnlyModValue;
+    }
+
+    public void setReadOnlyModValue(long modVal) {
+        this.readOnlyModValue = modVal;
     }
 
     /**

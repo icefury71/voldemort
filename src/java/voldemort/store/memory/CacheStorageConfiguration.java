@@ -55,4 +55,9 @@ public class CacheStorageConfiguration implements StorageConfiguration {
         return TYPE_NAME;
     }
 
+    public StorageEngine<ByteArray, byte[], byte[]> getStore(String name,
+                                                             VoldemortConfig voldemortConfig) {
+        return null;
+    }
+
 }

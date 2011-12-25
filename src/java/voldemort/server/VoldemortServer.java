@@ -286,7 +286,10 @@ public class VoldemortServer extends AbstractService {
                 config = VoldemortConfig.loadFromEnvironmentVariable();
             else if(args.length == 1)
                 config = VoldemortConfig.loadFromVoldemortHome(args[0]);
-            else
+            else if(args.length == 2) {
+                config = VoldemortConfig.loadFromVoldemortHome(args[0]);
+                config.setReadOnlyModValue(Long.parseLong(args[1]));
+            } else
                 croak("USAGE: java " + VoldemortServer.class.getName() + " [voldemort_home_dir]");
         } catch(Exception e) {
             logger.error(e);

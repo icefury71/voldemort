@@ -284,7 +284,8 @@ public class StorageService extends AbstractService {
             ((ReadOnlyStorageConfiguration) config).setRoutingStrategy(routingStrategy);
         }
 
-        final StorageEngine<ByteArray, byte[], byte[]> engine = config.getStore(storeDef.getName());
+        final StorageEngine<ByteArray, byte[], byte[]> engine = config.getStore(storeDef.getName(),
+                                                                                voldemortConfig);
         // Update the routing strategy + add listener to metadata
         if(storeDef.getType().compareTo(ReadOnlyStorageConfiguration.TYPE_NAME) == 0) {
             metadata.addMetadataStoreListener(storeDef.getName(), new MetadataStoreListener() {

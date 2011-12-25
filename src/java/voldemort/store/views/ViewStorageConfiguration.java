@@ -86,4 +86,9 @@ public class ViewStorageConfiguration implements StorageConfiguration {
         return (View<?, ?, ?, ?>) ReflectUtils.callConstructor(viewClass, new Object[] {});
     }
 
+    public StorageEngine<ByteArray, byte[], byte[]> getStore(String name,
+                                                             VoldemortConfig voldemortConfig) {
+        return null;
+    }
+
 }

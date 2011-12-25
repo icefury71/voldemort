@@ -58,4 +58,9 @@ public class NoopStorageConfiguration implements StorageConfiguration {
     }
 
     public void close() {}
+
+    public StorageEngine<ByteArray, byte[], byte[]> getStore(String name,
+                                                             VoldemortConfig voldemortConfig) {
+        return null;
+    }
 }

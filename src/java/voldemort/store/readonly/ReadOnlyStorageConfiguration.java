@@ -83,6 +83,25 @@ public class ReadOnlyStorageConfiguration implements StorageConfiguration {
         return store;
     }
 
+    public StorageEngine<ByteArray, byte[], byte[]> getStore(String name, VoldemortConfig vConfig) {
+        ReadOnlyStorageEngine store = new ReadOnlyStorageEngine(name,
+                                                                this.searcher,
+                                                                this.routingStrategy,
+                                                                this.nodeId,
+                                                                new File(storageDir, name),
+                                                                numBackups,
+                                                                deleteBackupMs,
+                                                                vConfig.getReadOnlyModValue());
+        ObjectName objName = JmxUtils.createObjectName(JmxUtils.getPackageName(store.getClass()),
+                                                       name + nodeId);
+        JmxUtils.registerMbean(ManagementFactory.getPlatformMBeanServer(),
+                               JmxUtils.createModelMBean(store),
+                               objName);
+        registeredBeans.add(objName);
+
+        return store;
+    }
+
     public String getType() {
         return TYPE_NAME;
     }
