@@ -17,7 +17,7 @@ public class AdminClientConfig {
     private volatile long adminConnectionTimeoutSec = 60;
     private volatile long adminSocketTimeoutSec = 24 * 60 * 60;
     private volatile int adminSocketBufferSize = 16 * 1024 * 1024;
-    private volatile boolean adminSocketKeepAlive = false;
+    private volatile boolean adminSocketKeepAlive = true;
     private volatile int restoreDataTimeoutSec = 365 * 24 * 60 * 60;
     private volatile int maxBackoffDelayMs = 60 * 1000;
 

@@ -25,6 +25,8 @@ public class AdminStoreSwapper extends StoreSwapper {
 
     private static final Logger logger = Logger.getLogger(AdminStoreSwapper.class);
 
+    private static final int MAX_SWAP_ATTEMPTS = 3;
+
     private AdminClient adminClient;
     private long timeoutMs;
     private boolean deleteFailedFetch = false;
@@ -172,7 +174,19 @@ public class AdminStoreSwapper extends StoreSwapper {
             try {
                 String dir = fetchFiles.get(nodeId);
                 logger.info("Attempting swap for node " + nodeId + " dir = " + dir);
-                previousDirs.put(nodeId, adminClient.swapStore(nodeId, storeName, dir));
+                for(int i = 0; i < MAX_SWAP_ATTEMPTS; i++) {
+                    try {
+                        previousDirs.put(nodeId, adminClient.swapStore(nodeId, storeName, dir));
+                        break;
+                    } catch(Exception e) {
+                        if(i == MAX_SWAP_ATTEMPTS - 1) {
+                            logger.info("Max retries exhausted. Swap failed for node : " + nodeId);
+                            throw e;
+                        }
+                        logger.info("Failed to swap for node " + nodeId + " dir = " + dir
+                                    + ". Trying again ! ");
+                    }
+                }
                 logger.info("Swap succeeded for node " + nodeId);
             } catch(Exception e) {
                 exceptions.put(nodeId, e);
