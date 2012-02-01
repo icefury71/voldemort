@@ -26,7 +26,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reducer;
@@ -89,9 +88,7 @@ public class HadoopStoreBuilderReducerPerBucket extends AbstractStoreBuilderConf
         // Read chunk id
         int chunkId = ReadOnlyUtils.chunk(key.get(), getNumChunks());
 
-        // Write key and position
-        this.indexFileStream[chunkId].write(key.get(), 0, key.getSize());
-        this.indexFileStream[chunkId].writeInt(this.position[chunkId]);
+        int oldPosition = this.position[chunkId];
 
         // Run key through checksum digest
         if(this.checkSumDigestIndex[chunkId] != null) {
@@ -117,6 +114,38 @@ public class HadoopStoreBuilderReducerPerBucket extends AbstractStoreBuilderConf
             if(this.partitionId == -1)
                 this.partitionId = ByteUtils.readInt(valueBytes, offsetTillNow);
             offsetTillNow += ByteUtils.SIZE_OF_INT;
+
+            // Initialize the index and data file streams if null
+            if(this.taskIndexFileName[chunkId] == null || this.taskValueFileName[chunkId] == null) {
+                String fileNamePrefix = null;
+                if(getSaveKeys()) {
+                    fileNamePrefix = new String(Integer.toString(this.partitionId) + "_"
+                                                + Integer.toString(this.replicaType) + "_");
+                } else {
+                    fileNamePrefix = new String(Integer.toString(this.partitionId) + "_");
+                }
+
+                // Initialize the node directory
+                Path nodeDir = new Path(this.outputDir, "node-" + this.nodeId);
+
+                // Create output directory, if it doesn't exist
+                FileSystem outputFs = nodeDir.getFileSystem(this.conf);
+                outputFs.mkdirs(nodeDir);
+
+                String chunkFileName = fileNamePrefix + Integer.toString(chunkId);
+                // Generate the final chunk files
+                this.taskIndexFileName[chunkId] = new Path(nodeDir, chunkFileName + ".index");
+                this.taskValueFileName[chunkId] = new Path(nodeDir, chunkFileName + ".data");
+
+                if(this.fs == null)
+                    this.fs = this.taskIndexFileName[chunkId].getFileSystem(this.conf);
+
+                this.indexFileStream[chunkId] = fs.create(this.taskIndexFileName[chunkId]);
+                this.valueFileStream[chunkId] = fs.create(this.taskValueFileName[chunkId]);
+
+                logger.info("Opening " + this.taskIndexFileName[chunkId] + " and "
+                            + this.taskValueFileName[chunkId] + " for writing.");
+            }
 
             // Read replica type
             if(getSaveKeys()) {
@@ -185,6 +214,10 @@ public class HadoopStoreBuilderReducerPerBucket extends AbstractStoreBuilderConf
         this.valueFileStream[chunkId].write(value);
         this.position[chunkId] += value.length;
 
+        // Write key and position
+        this.indexFileStream[chunkId].write(key.get(), 0, key.getSize());
+        this.indexFileStream[chunkId].writeInt(oldPosition);
+
         if(this.checkSumDigestValue[chunkId] != null) {
             this.checkSumDigestValue[chunkId].update(value);
         }
@@ -198,47 +231,26 @@ public class HadoopStoreBuilderReducerPerBucket extends AbstractStoreBuilderConf
     @Override
     public void configure(JobConf job) {
         super.configure(job);
-        try {
-            this.conf = job;
-            this.outputDir = job.get("final.output.dir");
-            this.taskId = job.get("mapred.task.id");
-            this.checkSumType = CheckSum.fromString(job.get("checksum.type"));
+        this.conf = job;
+        this.outputDir = job.get("final.output.dir");
+        this.taskId = job.get("mapred.task.id");
+        this.checkSumType = CheckSum.fromString(job.get("checksum.type"));
 
-            this.checkSumDigestIndex = new CheckSum[getNumChunks()];
-            this.checkSumDigestValue = new CheckSum[getNumChunks()];
-            this.position = new int[getNumChunks()];
-            this.taskIndexFileName = new Path[getNumChunks()];
-            this.taskValueFileName = new Path[getNumChunks()];
-            this.indexFileStream = new DataOutputStream[getNumChunks()];
-            this.valueFileStream = new DataOutputStream[getNumChunks()];
+        this.checkSumDigestIndex = new CheckSum[getNumChunks()];
+        this.checkSumDigestValue = new CheckSum[getNumChunks()];
+        this.position = new int[getNumChunks()];
+        this.taskIndexFileName = new Path[getNumChunks()];
+        this.taskValueFileName = new Path[getNumChunks()];
+        this.indexFileStream = new DataOutputStream[getNumChunks()];
+        this.valueFileStream = new DataOutputStream[getNumChunks()];
 
-            for(int chunkId = 0; chunkId < getNumChunks(); chunkId++) {
+        for(int chunkId = 0; chunkId < getNumChunks(); chunkId++) {
 
-                this.checkSumDigestIndex[chunkId] = CheckSum.getInstance(checkSumType);
-                this.checkSumDigestValue[chunkId] = CheckSum.getInstance(checkSumType);
-                this.position[chunkId] = 0;
-
-                this.taskIndexFileName[chunkId] = new Path(FileOutputFormat.getOutputPath(job),
-                                                           getStoreName() + "."
-                                                                   + Integer.toString(chunkId)
-                                                                   + "_" + this.taskId + ".index");
-                this.taskValueFileName[chunkId] = new Path(FileOutputFormat.getOutputPath(job),
-                                                           getStoreName() + "."
-                                                                   + Integer.toString(chunkId)
-                                                                   + "_" + this.taskId + ".data");
-
-                if(this.fs == null)
-                    this.fs = this.taskIndexFileName[chunkId].getFileSystem(job);
-
-                this.indexFileStream[chunkId] = fs.create(this.taskIndexFileName[chunkId]);
-                this.valueFileStream[chunkId] = fs.create(this.taskValueFileName[chunkId]);
-
-                logger.info("Opening " + this.taskIndexFileName[chunkId] + " and "
-                            + this.taskValueFileName[chunkId] + " for writing.");
-            }
-
-        } catch(IOException e) {
-            throw new RuntimeException("Failed to open Input/OutputStream", e);
+            this.checkSumDigestIndex[chunkId] = CheckSum.getInstance(checkSumType);
+            this.checkSumDigestValue[chunkId] = CheckSum.getInstance(checkSumType);
+            this.position[chunkId] = 0;
+            this.taskIndexFileName[chunkId] = null;
+            this.taskValueFileName[chunkId] = null;
         }
     }
 
@@ -275,7 +287,7 @@ public class HadoopStoreBuilderReducerPerBucket extends AbstractStoreBuilderConf
 
         // Create output directory, if it doesn't exist
         FileSystem outputFs = nodeDir.getFileSystem(this.conf);
-        outputFs.mkdirs(nodeDir);
+        // outputFs.mkdirs(nodeDir);
 
         // Write the checksum and output files
         for(int chunkId = 0; chunkId < getNumChunks(); chunkId++) {
@@ -301,16 +313,6 @@ public class HadoopStoreBuilderReducerPerBucket extends AbstractStoreBuilderConf
                                                + ", chunk - " + chunkId + " )");
                 }
             }
-
-            // Generate the final chunk files
-            Path indexFile = new Path(nodeDir, chunkFileName + ".index");
-            Path valueFile = new Path(nodeDir, chunkFileName + ".data");
-
-            logger.info("Moving " + this.taskIndexFileName[chunkId] + " to " + indexFile);
-            fs.rename(taskIndexFileName[chunkId], indexFile);
-            logger.info("Moving " + this.taskValueFileName[chunkId] + " to " + valueFile);
-            fs.rename(this.taskValueFileName[chunkId], valueFile);
-
         }
 
     }

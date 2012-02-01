@@ -26,7 +26,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reducer;
@@ -87,9 +86,7 @@ public class HadoopStoreBuilderReducer extends AbstractStoreBuilderConfigurable 
                        OutputCollector<Text, Text> output,
                        Reporter reporter) throws IOException {
 
-        // Write key and position
-        this.indexFileStream.write(key.get(), 0, key.getSize());
-        this.indexFileStream.writeInt(this.position);
+        int oldPosition = this.position;
 
         // Run key through checksum digest
         if(this.checkSumDigestIndex != null) {
@@ -119,6 +116,35 @@ public class HadoopStoreBuilderReducer extends AbstractStoreBuilderConfigurable 
             // Read chunk id
             if(this.chunkId == -1)
                 this.chunkId = ReadOnlyUtils.chunk(key.get(), getNumChunks());
+
+            // Initialize the index and data file streams if null
+            if(this.taskIndexFileName == null || this.taskValueFileName == null) {
+                String fileNamePrefix = null;
+                if(getSaveKeys()) {
+                    fileNamePrefix = new String(Integer.toString(this.partitionId) + "_"
+                                                + Integer.toString(this.replicaType) + "_"
+                                                + Integer.toString(this.chunkId));
+                } else {
+                    fileNamePrefix = new String(Integer.toString(this.partitionId) + "_"
+                                                + Integer.toString(this.chunkId));
+                }
+
+                // Create output directory, if it doesn't exist
+                Path nodeDir = new Path(this.outputDir, "node-" + this.nodeId);
+                FileSystem outputFs = nodeDir.getFileSystem(this.conf);
+                outputFs.mkdirs(nodeDir);
+
+                this.taskIndexFileName = new Path(nodeDir, fileNamePrefix + ".index");
+                this.taskValueFileName = new Path(nodeDir, fileNamePrefix + ".data");
+                if(this.fs == null)
+                    this.fs = this.taskIndexFileName.getFileSystem(this.conf);
+
+                this.indexFileStream = fs.create(this.taskIndexFileName);
+                this.valueFileStream = fs.create(this.taskValueFileName);
+
+                logger.info("Opening " + this.taskIndexFileName + " and " + this.taskValueFileName
+                            + " for writing.");
+            }
 
             // Read replica type
             if(getSaveKeys()) {
@@ -187,6 +213,10 @@ public class HadoopStoreBuilderReducer extends AbstractStoreBuilderConfigurable 
         this.valueFileStream.write(value);
         this.position += value.length;
 
+        // Write key and position
+        this.indexFileStream.write(key.get(), 0, key.getSize());
+        this.indexFileStream.writeInt(oldPosition);
+
         if(this.checkSumDigestValue != null) {
             this.checkSumDigestValue.update(value);
         }
@@ -200,36 +230,15 @@ public class HadoopStoreBuilderReducer extends AbstractStoreBuilderConfigurable 
     @Override
     public void configure(JobConf job) {
         super.configure(job);
-        try {
-            this.conf = job;
-            this.position = 0;
-            this.outputDir = job.get("final.output.dir");
-            this.taskId = job.get("mapred.task.id");
-            this.checkSumType = CheckSum.fromString(job.get("checksum.type"));
-            this.checkSumDigestIndex = CheckSum.getInstance(checkSumType);
-            this.checkSumDigestValue = CheckSum.getInstance(checkSumType);
-
-            this.taskIndexFileName = new Path(FileOutputFormat.getOutputPath(job), getStoreName()
-                                                                                   + "."
-                                                                                   + this.taskId
-                                                                                   + ".index");
-            this.taskValueFileName = new Path(FileOutputFormat.getOutputPath(job), getStoreName()
-                                                                                   + "."
-                                                                                   + this.taskId
-                                                                                   + ".data");
-
-            if(this.fs == null)
-                this.fs = this.taskIndexFileName.getFileSystem(job);
-
-            this.indexFileStream = fs.create(this.taskIndexFileName);
-            this.valueFileStream = fs.create(this.taskValueFileName);
-
-            logger.info("Opening " + this.taskIndexFileName + " and " + this.taskValueFileName
-                        + " for writing.");
-
-        } catch(IOException e) {
-            throw new RuntimeException("Failed to open Input/OutputStream", e);
-        }
+        this.conf = job;
+        this.position = 0;
+        this.outputDir = job.get("final.output.dir");
+        this.taskId = job.get("mapred.task.id");
+        this.checkSumType = CheckSum.fromString(job.get("checksum.type"));
+        this.checkSumDigestIndex = CheckSum.getInstance(checkSumType);
+        this.checkSumDigestValue = CheckSum.getInstance(checkSumType);
+        this.taskIndexFileName = null;
+        this.taskValueFileName = null;
     }
 
     @Override
@@ -262,10 +271,7 @@ public class HadoopStoreBuilderReducer extends AbstractStoreBuilderConfigurable 
 
         // Initialize the node directory
         Path nodeDir = new Path(this.outputDir, "node-" + this.nodeId);
-
-        // Create output directory, if it doesn't exist
         FileSystem outputFs = nodeDir.getFileSystem(this.conf);
-        outputFs.mkdirs(nodeDir);
 
         // Write the checksum and output files
         if(this.checkSumType != CheckSumType.NONE) {
@@ -287,15 +293,5 @@ public class HadoopStoreBuilderReducer extends AbstractStoreBuilderConfigurable 
                                            + chunkId + " )");
             }
         }
-
-        // Generate the final chunk files
-        Path indexFile = new Path(nodeDir, fileNamePrefix + ".index");
-        Path valueFile = new Path(nodeDir, fileNamePrefix + ".data");
-
-        logger.info("Moving " + this.taskIndexFileName + " to " + indexFile);
-        outputFs.rename(taskIndexFileName, indexFile);
-        logger.info("Moving " + this.taskValueFileName + " to " + valueFile);
-        outputFs.rename(this.taskValueFileName, valueFile);
-
     }
 }
