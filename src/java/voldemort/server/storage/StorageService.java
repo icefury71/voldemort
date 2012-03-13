@@ -312,7 +312,7 @@ public class StorageService extends AbstractService {
 
         // openStore() should have atomic semantics
         try {
-            registerEngine(engine, isReadOnly, storeDef.getType());
+            registerEngine(engine, isReadOnly, storeDef.getType(), true);
 
             if(voldemortConfig.isServerRoutingEnabled())
                 registerNodeStores(storeDef, metadata.getCluster(), voldemortConfig.getNodeId());
@@ -407,6 +407,13 @@ public class StorageService extends AbstractService {
     public void registerEngine(StorageEngine<ByteArray, byte[], byte[]> engine,
                                boolean isReadOnly,
                                String storeType) {
+        registerEngine(engine, isReadOnly, storeType, false);
+    }
+
+    public void registerEngine(StorageEngine<ByteArray, byte[], byte[]> engine,
+                               boolean isReadOnly,
+                               String storeType,
+                               boolean withHistogram) {
         Cluster cluster = this.metadata.getCluster();
         storeRepository.addStorageEngine(engine);
 
@@ -455,7 +462,9 @@ public class StorageService extends AbstractService {
         }
 
         if(voldemortConfig.isStatTrackingEnabled()) {
-            StatTrackingStore statStore = new StatTrackingStore(store, this.storeStats);
+            StatTrackingStore statStore = new StatTrackingStore(store,
+                                                                this.storeStats,
+                                                                withHistogram);
             store = statStore;
             if(voldemortConfig.isJmxEnabled()) {
 

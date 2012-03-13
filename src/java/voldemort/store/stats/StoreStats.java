@@ -23,10 +23,14 @@ public class StoreStats {
      *        aggregate data across many stores
      */
     public StoreStats(StoreStats parent) {
+        this(parent, false);
+    }
+
+    public StoreStats(StoreStats parent, boolean withHistogram) {
         counters = new EnumMap<Tracked, RequestCounter>(Tracked.class);
 
         for(Tracked tracked: Tracked.values()) {
-            counters.put(tracked, new RequestCounter(300000, true));
+            counters.put(tracked, new RequestCounter(300000, withHistogram));
         }
         this.parent = parent;
     }

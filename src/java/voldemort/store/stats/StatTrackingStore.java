@@ -41,8 +41,14 @@ public class StatTrackingStore extends DelegatingStore<ByteArray, byte[], byte[]
     private StoreStats stats;
 
     public StatTrackingStore(Store<ByteArray, byte[], byte[]> innerStore, StoreStats parentStats) {
+        this(innerStore, parentStats, false);
+    }
+
+    public StatTrackingStore(Store<ByteArray, byte[], byte[]> innerStore,
+                             StoreStats parentStats,
+                             boolean withHistogram) {
         super(innerStore);
-        this.stats = new StoreStats(parentStats);
+        this.stats = new StoreStats(parentStats, withHistogram);
     }
 
     @Override
@@ -151,6 +157,6 @@ public class StatTrackingStore extends DelegatingStore<ByteArray, byte[], byte[]
 
     @JmxOperation(description = "Reset statistics.", impact = MBeanOperationInfo.ACTION)
     public void resetStatistics() {
-        this.stats = new StoreStats();
+        this.stats = new StoreStats(null, true);
     }
 }
