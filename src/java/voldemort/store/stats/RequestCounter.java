@@ -48,7 +48,7 @@ public class RequestCounter {
         this.q99LatencyMs = 0;
         this.withHistogram = withHistogram;
         if(this.withHistogram)
-            this.histogram = new Histogram(65535, 1);
+            this.histogram = new Histogram(10000, 1);
         else
             this.histogram = null;
     }
