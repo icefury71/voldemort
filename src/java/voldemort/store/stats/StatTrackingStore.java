@@ -51,6 +51,11 @@ public class StatTrackingStore extends DelegatingStore<ByteArray, byte[], byte[]
         this.stats = new StoreStats(parentStats, withHistogram);
     }
 
+    public void close() throws VoldemortException {
+        stats = null;
+        super.close();
+    }
+
     @Override
     public boolean delete(ByteArray key, Version version) throws VoldemortException {
         long start = System.nanoTime();
