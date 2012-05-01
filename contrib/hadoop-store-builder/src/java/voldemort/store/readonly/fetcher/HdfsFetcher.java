@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.security.PrivilegedExceptionAction;
 import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -35,6 +36,8 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 
 import voldemort.VoldemortException;
@@ -138,8 +141,30 @@ public class HdfsFetcher implements FileFetcher {
         ObjectName jmxName = null;
         try {
 
+            // Authenticate
+            String keytabLocation = "/home/csoman/linkedin_setup/voldemort/voldemrt.headless.keytab";
+            String proxyUser = "voldemrt@GRID.LINKEDIN.COM";
+            final Configuration conf = new Configuration();
+
+            // Get blessed by Kerberos
+            SecurityUtil.login(conf, keytabLocation, proxyUser);
+            UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+            System.err.println("Hello, I'm " + loginUser.getUserName());
+
+            System.err.println(sourceFileUrl);
+            String hadoopCluster = "heartsnn01";
+            String protocolToUse = "hftp";
+            String portNumberToUse = "50070";
+
+            if(sourceFileUrl.contains(hadoopCluster)) {
+                sourceFileUrl = sourceFileUrl.replace("hdfs", protocolToUse);
+                sourceFileUrl = sourceFileUrl.replace("9000", portNumberToUse);
+            }
+            System.err.println(sourceFileUrl);
+
             Path path = new Path(sourceFileUrl);
             Configuration config = new Configuration();
+            System.err.println(config.get("fs.default.name"));
             config.setInt("io.socket.receive.buffer", bufferSize);
             config.set("hadoop.rpc.socket.factory.class.ClientProtocol",
                        ConfigurableSocketFactory.class.getName());
@@ -441,12 +466,46 @@ public class HdfsFetcher implements FileFetcher {
             Utils.croak("USAGE: java " + HdfsFetcher.class.getName() + " url");
         String url = args[0];
         long maxBytesPerSec = 1024 * 1024 * 1024;
+        System.err.println(url);
+
+        String hadoopCluster = "heartsnn01";
+        String protocolToUse = "hftp";
+        String portNumberToUse = "50070";
+
+        if(url.contains(hadoopCluster)) {
+            url = url.replace("hdfs", protocolToUse);
+            url = url.replace("9000", portNumberToUse);
+        }
+        System.err.println(url);
+
         Path p = new Path(url);
         Configuration config = new Configuration();
+        System.err.println(config.get("fs.default.name"));
         config.setInt("io.file.buffer.size", VoldemortConfig.DEFAULT_BUFFER_SIZE);
         config.set("hadoop.rpc.socket.factory.class.ClientProtocol",
                    ConfigurableSocketFactory.class.getName());
         config.setInt("io.socket.receive.buffer", 1 * 1024 * 1024 - 10000);
+
+        // Authenticate
+        // String keytabLocation =
+        // "/home/csoman/linkedin_setup/voldemort/voldemrt.headless.keytab";
+        String keytabLocation = "/export/home/csoman/voldemrt.headless.keytab";
+        String proxyUser = "voldemrt@GRID.LINKEDIN.COM";
+        // Get blessed by Kerberos
+        // SecurityUtil.login(config, keytabLocation, proxyUser);
+
+        UserGroupInformation.loginUserFromKeytab(proxyUser, keytabLocation);
+        UserGroupInformation.getCurrentUser().doAs(new PrivilegedExceptionAction<Void>() {
+
+            public Void run() throws Exception {
+                System.err.println("wth? " + UserGroupInformation.getCurrentUser());
+                UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+                System.err.println("Hello, I'm " + loginUser.getUserName());
+
+                return null;
+            }
+        });
+
         FileStatus status = p.getFileSystem(config).getFileStatus(p);
         long size = status.getLen();
         HdfsFetcher fetcher = new HdfsFetcher(maxBytesPerSec,
