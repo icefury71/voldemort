@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.text.NumberFormat;
 import java.util.Arrays;
@@ -36,7 +37,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 
@@ -141,34 +141,38 @@ public class HdfsFetcher implements FileFetcher {
         ObjectName jmxName = null;
         try {
 
-            // Authenticate
-            String keytabLocation = "/home/csoman/linkedin_setup/voldemort/voldemrt.headless.keytab";
-            String proxyUser = "voldemrt@GRID.LINKEDIN.COM";
-            final Configuration conf = new Configuration();
-
-            // Get blessed by Kerberos
-            SecurityUtil.login(conf, keytabLocation, proxyUser);
-            UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
-            System.err.println("Hello, I'm " + loginUser.getUserName());
-
-            System.err.println(sourceFileUrl);
-            String hadoopCluster = "heartsnn01";
-            String protocolToUse = "hftp";
-            String portNumberToUse = "50070";
-
-            if(sourceFileUrl.contains(hadoopCluster)) {
-                sourceFileUrl = sourceFileUrl.replace("hdfs", protocolToUse);
-                sourceFileUrl = sourceFileUrl.replace("9000", portNumberToUse);
-            }
-            System.err.println(sourceFileUrl);
-
-            Path path = new Path(sourceFileUrl);
-            Configuration config = new Configuration();
+            final Path path = new Path(sourceFileUrl);
+            final Configuration config = new Configuration();
             System.err.println(config.get("fs.default.name"));
             config.setInt("io.socket.receive.buffer", bufferSize);
             config.set("hadoop.rpc.socket.factory.class.ClientProtocol",
                        ConfigurableSocketFactory.class.getName());
-            FileSystem fs = path.getFileSystem(config);
+
+            // // Get the filesystem
+            String keytabLocation = "/export/home/csoman/voldemrt.headless.keytab";
+            // String proxyUser = "voldemrt@GRID.LINKEDIN.COM";
+            String proxyUser = "voldemrt";
+            // Get blessed by Kerberos
+
+            // SecurityUtil.login(config, keytabLocation, proxyUser);
+
+            UserGroupInformation.loginUserFromKeytab(proxyUser, keytabLocation);
+            System.out.println("I've logged in and am now Doasing as "
+                               + UserGroupInformation.getCurrentUser().getUserName());
+            FileSystem fs = null;
+            try {
+                fs = UserGroupInformation.getCurrentUser()
+                                         .doAs(new PrivilegedExceptionAction<FileSystem>() {
+
+                                             public FileSystem run() throws Exception {
+                                                 FileSystem fs = path.getFileSystem(config);
+                                                 return fs;
+                                             }
+                                         });
+            } catch(InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
 
             CopyStats stats = new CopyStats(sourceFileUrl, sizeOfPath(fs, path));
             jmxName = JmxUtils.registerMbean("hdfs-copy-" + copyCount.getAndIncrement(), stats);
@@ -179,6 +183,7 @@ public class HdfsFetcher implements FileFetcher {
                                              + " already exists");
             }
 
+            System.out.println("Doing actual fetch now");
             boolean result = fetch(fs, path, destination, stats);
 
             if(result) {
@@ -211,6 +216,7 @@ public class HdfsFetcher implements FileFetcher {
                 CheckSum fileCheckSumGenerator = null;
 
                 for(FileStatus status: statuses) {
+                    System.out.println("**** Received: " + status.getPath());
 
                     // Kept for backwards compatibility
                     if(status.getPath().getName().contains("checkSum.txt")) {
@@ -464,53 +470,82 @@ public class HdfsFetcher implements FileFetcher {
     public static void main(String[] args) throws Exception {
         if(args.length != 1)
             Utils.croak("USAGE: java " + HdfsFetcher.class.getName() + " url");
-        String url = args[0];
+
+        String keytabLocation = "/export/home/csoman/voldemrt.headless.keytab";
+        // String proxyUser = "voldemrt@GRID.LINKEDIN.COM";
+        String proxyUser = "voldemrt";
+        // Get blessed by Kerberos
+        final String urlToUse = args[0];
+
+        // UserGroupInformation.loginUserFromKeytab(proxyUser, keytabLocation);
+        // System.out.println("I've logged in and am now Doasing as "
+        // + UserGroupInformation.getCurrentUser().getUserName());
+        // UserGroupInformation.getCurrentUser().doAs(new
+        // PrivilegedExceptionAction<Void>() {
+        //
+        // public Void run() throws Exception {
+
+        String url = urlToUse;
         long maxBytesPerSec = 1024 * 1024 * 1024;
         System.err.println(url);
 
-        String hadoopCluster = "heartsnn01";
-        String protocolToUse = "hftp";
-        String portNumberToUse = "50070";
+        // String hadoopCluster = "heartsnn01";
+        // String protocolToUse = "hftp";
+        // String portNumberToUse = "50070";
+        //
+        // if(url.contains(hadoopCluster)) {
+        // url = url.replace("hdfs", protocolToUse);
+        // url = url.replace("9000", portNumberToUse);
+        // }
+        // System.err.println(url);
 
-        if(url.contains(hadoopCluster)) {
-            url = url.replace("hdfs", protocolToUse);
-            url = url.replace("9000", portNumberToUse);
-        }
-        System.err.println(url);
-
-        Path p = new Path(url);
-        Configuration config = new Configuration();
+        final Configuration config = new Configuration();
         System.err.println(config.get("fs.default.name"));
         config.setInt("io.file.buffer.size", VoldemortConfig.DEFAULT_BUFFER_SIZE);
         config.set("hadoop.rpc.socket.factory.class.ClientProtocol",
                    ConfigurableSocketFactory.class.getName());
         config.setInt("io.socket.receive.buffer", 1 * 1024 * 1024 - 10000);
 
-        // Authenticate
-        // String keytabLocation =
-        // "/home/csoman/linkedin_setup/voldemort/voldemrt.headless.keytab";
-        String keytabLocation = "/export/home/csoman/voldemrt.headless.keytab";
-        String proxyUser = "voldemrt@GRID.LINKEDIN.COM";
-        // Get blessed by Kerberos
-        // SecurityUtil.login(config, keytabLocation, proxyUser);
+        Path p = new Path(url);
+        // Path p = new Path("/user/csoman/temp.txt");
+
+        System.err.println("wth? " + UserGroupInformation.getCurrentUser());
+        UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+        System.err.println("Hello, I'm " + loginUser.getUserName());
+
+        final URI uri = new URI(url);
+
+        // Get the filesystem
 
         UserGroupInformation.loginUserFromKeytab(proxyUser, keytabLocation);
-        UserGroupInformation.getCurrentUser().doAs(new PrivilegedExceptionAction<Void>() {
+        System.out.println("I've logged in and am now Doasing as "
+                           + UserGroupInformation.getCurrentUser().getUserName());
+        FileSystem fs = null;
+        try {
+            fs = UserGroupInformation.getCurrentUser()
+                                     .doAs(new PrivilegedExceptionAction<FileSystem>() {
 
-            public Void run() throws Exception {
-                System.err.println("wth? " + UserGroupInformation.getCurrentUser());
-                UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
-                System.err.println("Hello, I'm " + loginUser.getUserName());
+                                         public FileSystem run() throws Exception {
+                                             FileSystem fs = FileSystem.get(uri, config);
+                                             return fs;
+                                         }
+                                     });
+        } catch(InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
-                return null;
-            }
-        });
+        System.err.println("Path : " + p);
 
-        FileStatus status = p.getFileSystem(config).getFileStatus(p);
+        FileStatus status = fs.getFileStatus(p);
         long size = status.getLen();
+        System.out.println(" Got file status path : " + status.getPath() + " and size : " + size);
+
+        // Actual OP
         HdfsFetcher fetcher = new HdfsFetcher(maxBytesPerSec,
                                               VoldemortConfig.REPORTING_INTERVAL_BYTES,
                                               VoldemortConfig.DEFAULT_BUFFER_SIZE);
+
         long start = System.currentTimeMillis();
         File location = fetcher.fetch(url, System.getProperty("java.io.tmpdir") + File.separator
                                            + start);
@@ -519,5 +554,12 @@ public class HdfsFetcher implements FileFetcher {
         nf.setMaximumFractionDigits(2);
         System.out.println("Fetch to " + location + " completed: "
                            + nf.format(rate / (1024.0 * 1024.0)) + " MB/sec.");
+
+        fs.close();
+
+        // return null;
+        // }
+        // });
+
     }
 }
