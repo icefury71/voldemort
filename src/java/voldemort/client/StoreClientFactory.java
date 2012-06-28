@@ -98,7 +98,8 @@ public interface StoreClientFactory {
     <K, V, T> Store<K, V, T> getRawStore(String storeName,
                                          InconsistencyResolver<Versioned<V>> resolver,
                                          UUID clientId,
-                                         String customStoresXml);
+                                         String customStoresXml,
+                                         String clusterXmlString);
 
     /**
      * Close the store client
