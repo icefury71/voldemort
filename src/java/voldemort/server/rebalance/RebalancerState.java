@@ -47,6 +47,7 @@ public class RebalancerState {
     }
 
     public static RebalancerState create(String json) {
+        System.out.println("********** JSON string: " + json + " ************");
         List<RebalancePartitionsInfo> stealInfoList = Lists.newLinkedList();
         JsonReader reader = new JsonReader(new StringReader(json));
 

@@ -128,15 +128,25 @@ public class RebalancePartitionsInfo {
             HashMap<Integer, List<Integer>> replicaToAddPartition = Maps.newHashMap();
             HashMap<Integer, List<Integer>> replicaToDeletePartitionList = Maps.newHashMap();
             for(int replicaNo = 0; replicaNo <= maxReplicas; replicaNo++) {
-                List<Integer> partitionList = Utils.uncheckedCast(map.get(unbalancedStore
-                                                                          + "replicaToAddPartitionList"
-                                                                          + Integer.toString(replicaNo)));
+                System.out.println("********** Getting key : " + unbalancedStore
+                                   + "replicaToAddPartitionList" + Integer.toString(replicaNo)
+                                   + " ************");
+                Object o = map.get(unbalancedStore + "replicaToAddPartitionList"
+                                   + Integer.toString(replicaNo));
+                if(o == null) {
+                    System.out.println("****************** ADD LIST NULL !!!!!!!!!! ************************");
+                }
+                List<Integer> partitionList = Utils.uncheckedCast(o);
                 if(partitionList.size() > 0)
                     replicaToAddPartition.put(replicaNo, partitionList);
 
-                List<Integer> deletePartitionList = Utils.uncheckedCast(map.get(unbalancedStore
-                                                                                + "replicaToDeletePartitionList"
-                                                                                + Integer.toString(replicaNo)));
+                o = map.get(unbalancedStore + "replicaToDeletePartitionList"
+                            + Integer.toString(replicaNo));
+                if(o == null) {
+                    System.out.println("****************** DELETE LIST NULL !!!!!!!!!! ************************");
+                }
+
+                List<Integer> deletePartitionList = Utils.uncheckedCast(o);
                 if(deletePartitionList.size() > 0)
                     replicaToDeletePartitionList.put(replicaNo, deletePartitionList);
             }
