@@ -37,6 +37,7 @@ public class CoordinatorConfig {
     private volatile int metadataCheckIntervalInMs = 5000;
     private volatile int nettyServerPort = 8080;
     private volatile int nettyServerBacklog = 1000;
+    private volatile boolean noopEnabled = false;
 
     /* Propery names for propery-based configuration */
     public static final String BOOTSTRAP_URLS_PROPERTY = "bootstrap_urls";
@@ -44,6 +45,7 @@ public class CoordinatorConfig {
     public static final String METADATA_CHECK_INTERVAL_IN_MS = "metadata_check_interval_in_ms";
     public static final String NETTY_SERVER_PORT = "netty_server_port";
     public static final String NETTY_SERVER_BACKLOG = "netty_server_backlog";
+    public static final String NOOP_ENABLED = "noop_enabled";
 
     /**
      * Instantiate the coordinator config using a properties file
@@ -107,6 +109,10 @@ public class CoordinatorConfig {
 
         if(props.containsKey(NETTY_SERVER_BACKLOG)) {
             setMetadataCheckIntervalInMs(props.getInt(NETTY_SERVER_BACKLOG, this.nettyServerBacklog));
+        }
+
+        if(props.containsKey(NOOP_ENABLED)) {
+            setNoopEnabled(props.getBoolean(NOOP_ENABLED, this.noopEnabled));
         }
     }
 
@@ -181,6 +187,14 @@ public class CoordinatorConfig {
      */
     public void setNettyServerBacklog(int nettyServerBacklog) {
         this.nettyServerBacklog = nettyServerBacklog;
+    }
+
+    public boolean isNoopEnabled() {
+        return noopEnabled;
+    }
+
+    public void setNoopEnabled(boolean noopEnabled) {
+        this.noopEnabled = noopEnabled;
     }
 
 }

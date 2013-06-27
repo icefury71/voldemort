@@ -31,6 +31,10 @@ public class GetSchemataRequestExecutor implements Runnable {
                           + "{ \"name\": \"key-serializer\", \"type\": \"string\" } ,"
                           + "{ \"name\": \"value-serializer\", \"type\": \"string\"}]}";
 
+    public GetSchemataRequestExecutor(MessageEvent requestEvent) {
+        this.getRequestMessageEvent = requestEvent;
+    }
+
     public GetSchemataRequestExecutor(MessageEvent requestEvent,
                                       String storeName,
                                       SocketStoreClientFactory storeClientFactory) {

@@ -74,7 +74,6 @@ public class CoordinatorService extends AbstractService {
 
     private CoordinatorConfig coordinatorConfig = null;
 
-    private boolean noop = false;
     private SocketStoreClientFactory storeClientFactory = null;
     private AsyncMetadataVersionManager asyncMetadataManager = null;
     private SchedulerService schedulerService = null;
@@ -138,41 +137,45 @@ public class CoordinatorService extends AbstractService {
     @Override
     protected void startInner() {
 
-        // Initialize the Voldemort Metadata
-        ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setBootstrapUrls(this.coordinatorConfig.getBootstrapURLs());
-        storeClientFactory = new SocketStoreClientFactory(clientConfig);
-        initializeFatClients();
+        boolean noop = this.coordinatorConfig.isNoopEnabled();
 
-        // Setup the Async Metadata checker
-        SystemStoreRepository sysRepository = new SystemStoreRepository();
-        String clusterXml = storeClientFactory.bootstrapMetadataWithRetries(MetadataStore.CLUSTER_KEY);
+        if(!noop) {
+            // Initialize the Voldemort Metadata
+            ClientConfig clientConfig = new ClientConfig();
+            clientConfig.setBootstrapUrls(this.coordinatorConfig.getBootstrapURLs());
+            storeClientFactory = new SocketStoreClientFactory(clientConfig);
+            initializeFatClients();
 
-        sysRepository.createSystemStores(clientConfig,
-                                         clusterXml,
-                                         storeClientFactory.getFailureDetector());
-        // Create a callback for re-bootstrapping the client
-        Callable<Void> rebootstrapCallback = new Callable<Void>() {
+            // Setup the Async Metadata checker
+            SystemStoreRepository sysRepository = new SystemStoreRepository();
+            String clusterXml = storeClientFactory.bootstrapMetadataWithRetries(MetadataStore.CLUSTER_KEY);
 
-            @Override
-            public Void call() throws Exception {
-                initializeFatClients();
-                return null;
-            }
+            sysRepository.createSystemStores(clientConfig,
+                                             clusterXml,
+                                             storeClientFactory.getFailureDetector());
+            // Create a callback for re-bootstrapping the client
+            Callable<Void> rebootstrapCallback = new Callable<Void>() {
 
-        };
+                @Override
+                public Void call() throws Exception {
+                    initializeFatClients();
+                    return null;
+                }
 
-        // For now track changes in cluster.xml only
-        // TODO: Modify this to track stores.xml in the future
-        asyncMetadataManager = new AsyncMetadataVersionManager(sysRepository,
-                                                               rebootstrapCallback,
-                                                               null);
+            };
 
-        schedulerService = new SchedulerService(1, SystemTime.INSTANCE, true);
-        schedulerService.schedule(asyncMetadataManager.getClass().getName(),
-                                  asyncMetadataManager,
-                                  new Date(),
-                                  this.coordinatorConfig.getMetadataCheckIntervalInMs());
+            // For now track changes in cluster.xml only
+            // TODO: Modify this to track stores.xml in the future
+            asyncMetadataManager = new AsyncMetadataVersionManager(sysRepository,
+                                                                   rebootstrapCallback,
+                                                                   null);
+
+            schedulerService = new SchedulerService(1, SystemTime.INSTANCE, true);
+            schedulerService.schedule(asyncMetadataManager.getClass().getName(),
+                                      asyncMetadataManager,
+                                      new Date(),
+                                      this.coordinatorConfig.getMetadataCheckIntervalInMs());
+        }
 
         // Configure the server.
         this.workerPool = (ThreadPoolExecutor) Executors.newCachedThreadPool();

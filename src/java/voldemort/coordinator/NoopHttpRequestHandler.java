@@ -16,6 +16,7 @@
 
 package voldemort.coordinator;
 
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,9 +25,12 @@ import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 
+import voldemort.VoldemortTestConstants;
 import voldemort.common.VoldemortOpCode;
+import voldemort.store.StoreDefinition;
 import voldemort.versioning.VectorClock;
 import voldemort.versioning.Versioned;
+import voldemort.xml.StoreDefinitionsMapper;
 
 /**
  * A class that does a Noop after handling a REST request from the thin client.
@@ -43,16 +47,38 @@ public class NoopHttpRequestHandler extends VoldemortHttpRequestHandler {
         this.request = (HttpRequest) e.getMessage();
         byte operationType = getOperationType(this.request.getMethod());
 
+        String requestURI = this.request.getUri();
+        String storeName = null;
+        String[] parts = requestURI.split("/");
+        if(parts.length > 1) {
+            storeName = parts[1];
+        }
+
         switch(operationType) {
             case VoldemortOpCode.GET_OP_CODE:
-                HttpGetRequestExecutor getExecutor = new HttpGetRequestExecutor(e);
+                if(storeName != null && storeName.equalsIgnoreCase(SCHEMATA)) {
+                    GetSchemataRequestExecutor getSchemaExecutor = new GetSchemataRequestExecutor(e);
+                    StoreDefinitionsMapper mapper = new StoreDefinitionsMapper();
+                    List<StoreDefinition> storeDefs = mapper.readStoreList(new StringReader(VoldemortTestConstants.getSimpleStoreDefinitionsXml()));
+                    StoreDefinition finalStoreDef = null;
+                    for(StoreDefinition storeDefinition: storeDefs) {
+                        if(storeDefinition.getName().equalsIgnoreCase("test-replication-memory")) {
+                            finalStoreDef = storeDefinition;
+                            break;
+                        }
+                    }
+                    String serializerInfoXml = CoordinatorUtils.constructSerializerInfoXml(finalStoreDef);
+                    getSchemaExecutor.writeResponse(serializerInfoXml.getBytes("UTF-8"));
 
-                Versioned<byte[]> responseVersioned = null;
-                byte[] sampleByteArray = "a".getBytes();
-                responseVersioned = new Versioned<byte[]>(sampleByteArray);
-                List<Versioned<byte[]>> responseList = new ArrayList<Versioned<byte[]>>();
-                responseList.add(responseVersioned);
-                getExecutor.writeResponse(responseList);
+                } else {
+                    HttpGetRequestExecutor getExecutor = new HttpGetRequestExecutor(e);
+                    Versioned<byte[]> responseVersioned = null;
+                    byte[] sampleByteArray = "a".getBytes();
+                    responseVersioned = new Versioned<byte[]>(sampleByteArray);
+                    List<Versioned<byte[]>> responseList = new ArrayList<Versioned<byte[]>>();
+                    responseList.add(responseVersioned);
+                    getExecutor.writeResponse(responseList);
+                }
                 break;
             case VoldemortOpCode.PUT_OP_CODE:
                 HttpPutRequestExecutor putRequestExecutor = new HttpPutRequestExecutor(e);

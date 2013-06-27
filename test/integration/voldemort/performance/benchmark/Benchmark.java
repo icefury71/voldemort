@@ -36,6 +36,7 @@ import voldemort.client.SocketStoreClientFactory;
 import voldemort.client.StoreClient;
 import voldemort.client.StoreClientFactory;
 import voldemort.client.protocol.RequestFormatType;
+import voldemort.restclient.RESTClient;
 import voldemort.serialization.IdentitySerializer;
 import voldemort.serialization.Serializer;
 import voldemort.serialization.SerializerDefinition;
@@ -147,7 +148,7 @@ public class Benchmark {
         @Override
         public void run() {
             boolean testComplete = true;
-            int totalOps = 0, prevTotalOps = 0;
+            int totalOps = 0, prevTotalOps = 0, totalFailureCount = 0;
             do {
                 testComplete = true;
                 totalOps = 0;
@@ -156,13 +157,15 @@ public class Benchmark {
                         testComplete = false;
                     }
                     totalOps += ((ClientThread) thread).getOpsDone();
+                    totalFailureCount += ((ClientThread) thread).getFailureCount();
                 }
 
                 if(totalOps != 0 && totalOps != prevTotalOps) {
                     System.out.println("[status]\tThroughput(ops/sec): "
                                        + Time.MS_PER_SECOND
                                        * ((double) totalOps / (double) (System.currentTimeMillis() - startTime))
-                                       + "\tOperations: " + totalOps);
+                                       + "\tTotal Failures:" + totalFailureCount + "\tOperations: "
+                                       + totalOps);
                     Metrics.getInstance().printReport(System.out);
                 }
                 prevTotalOps = totalOps;
@@ -182,6 +185,7 @@ public class Benchmark {
         private int operationsCount;
         private double targetThroughputPerMs;
         private int opsDone;
+        private int failureCount = 0;
         private final WorkloadPlugin plugin;
 
         public ClientThread(VoldemortWrapper db,
@@ -205,6 +209,10 @@ public class Benchmark {
             return this.opsDone;
         }
 
+        public int getFailureCount() {
+            return this.failureCount;
+        }
+
         @Override
         public void run() {
             long startTime = System.currentTimeMillis();
@@ -219,11 +227,12 @@ public class Benchmark {
                             break;
                         }
                     }
+                    opsDone++;
                 } catch(Exception e) {
                     if(this.isVerbose)
                         e.printStackTrace();
+                    failureCount++;
                 }
-                opsDone++;
 
                 if(targetThroughputPerMs > 0) {
                     double timePerOp = ((double) opsDone) / targetThroughputPerMs;
@@ -336,7 +345,17 @@ public class Benchmark {
                 throw new VoldemortException("Missing storename");
             }
 
-            String socketUrl = benchmarkProps.getString(URL);
+            String bootstrapURL = benchmarkProps.getString(URL);
+            String socketUrl = "";
+
+            if(bootstrapURL.contains("http")) {
+                this.storeClient = new RESTClient(bootstrapURL, "test");
+                socketUrl = bootstrapURL.replace("http", "tcp");
+                socketUrl = socketUrl.replace("8080", "6666");
+            } else {
+                socketUrl = bootstrapURL;
+            }
+
             String storeName = benchmarkProps.getString(STORE_NAME);
 
             ClientConfig clientConfig = new ClientConfig().setMaxThreads(numThreads)
@@ -355,8 +374,12 @@ public class Benchmark {
             if(clientZoneId >= 0) {
                 clientConfig.setClientZoneId(clientZoneId);
             }
+
             SocketStoreClientFactory socketFactory = new SocketStoreClientFactory(clientConfig);
-            this.storeClient = socketFactory.getStoreClient(storeName);
+
+            if(!bootstrapURL.contains("http")) {
+                this.storeClient = socketFactory.getStoreClient(storeName);
+            }
             StoreDefinition storeDef = getStoreDefinition(socketFactory, storeName);
             this.keyType = findKeyType(storeDef);
             benchmarkProps.put(Benchmark.KEY_TYPE, this.keyType);
