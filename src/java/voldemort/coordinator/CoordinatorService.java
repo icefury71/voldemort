@@ -189,7 +189,7 @@ public class CoordinatorService extends AbstractService {
         // Set up the event pipeline factory.
         this.bootstrap.setPipelineFactory(new CoordinatorPipelineFactory(this.fatClientMap,
                                                                          this.errorStats,
-                                                                         noop));
+                                                                         this.coordinatorConfig));
 
         // Register the Mbean
         // Netty Queue stats

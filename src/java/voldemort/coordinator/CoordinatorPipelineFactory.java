@@ -34,16 +34,16 @@ import org.jboss.netty.handler.codec.http.HttpResponseEncoder;
  */
 public class CoordinatorPipelineFactory implements ChannelPipelineFactory {
 
-    private boolean noop = false;
+    private CoordinatorConfig coordinatorConfig = null;
     private Map<String, FatClientWrapper> fatClientMap;
     private CoordinatorErrorStats errorStats = null;
 
     public CoordinatorPipelineFactory(Map<String, FatClientWrapper> fatClientMap,
                                       CoordinatorErrorStats errorStats,
-                                      boolean noop) {
+                                      CoordinatorConfig coordinatorConfig) {
         this.fatClientMap = fatClientMap;
         this.errorStats = errorStats;
-        this.noop = noop;
+        this.coordinatorConfig = coordinatorConfig;
     }
 
     @Override
@@ -57,12 +57,14 @@ public class CoordinatorPipelineFactory implements ChannelPipelineFactory {
         // Remove the following line if you don't want automatic content
         // compression.
         pipeline.addLast("deflater", new HttpContentCompressor());
-        if(this.noop) {
-            pipeline.addLast("handler", new NoopHttpRequestHandler());
+        if(this.coordinatorConfig.isNoopEnabled()) {
+            pipeline.addLast("handler",
+                             new NoopHttpRequestHandler(this.coordinatorConfig.getNoopSleepDelayInMs()));
         } else {
             pipeline.addLast("handler", new VoldemortHttpRequestHandler(this.fatClientMap,
                                                                         this.errorStats));
         }
+
         return pipeline;
     }
 }

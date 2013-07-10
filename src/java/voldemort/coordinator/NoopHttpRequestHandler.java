@@ -16,7 +16,6 @@
 
 package voldemort.coordinator;
 
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,9 +24,7 @@ import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.handler.codec.http.HttpMethod;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 
-import voldemort.VoldemortTestConstants;
 import voldemort.common.VoldemortOpCode;
-import voldemort.store.StoreDefinition;
 import voldemort.versioning.VectorClock;
 import voldemort.versioning.Versioned;
 import voldemort.xml.StoreDefinitionsMapper;
@@ -40,7 +37,13 @@ import voldemort.xml.StoreDefinitionsMapper;
  */
 public class NoopHttpRequestHandler extends VoldemortHttpRequestHandler {
 
+    private int maxSleepDelayInMs;
+
     public NoopHttpRequestHandler() {}
+
+    public NoopHttpRequestHandler(int delay) {
+        this.maxSleepDelayInMs = delay;
+    }
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
@@ -54,20 +57,19 @@ public class NoopHttpRequestHandler extends VoldemortHttpRequestHandler {
             storeName = parts[1];
         }
 
+        if(this.maxSleepDelayInMs > 0) {
+            try {
+                Thread.sleep(this.maxSleepDelayInMs);
+            } catch(Exception ic) {}
+        }
+
         switch(operationType) {
             case VoldemortOpCode.GET_OP_CODE:
                 if(storeName != null && storeName.equalsIgnoreCase(SCHEMATA)) {
                     GetSchemataRequestExecutor getSchemaExecutor = new GetSchemataRequestExecutor(e);
                     StoreDefinitionsMapper mapper = new StoreDefinitionsMapper();
-                    List<StoreDefinition> storeDefs = mapper.readStoreList(new StringReader(VoldemortTestConstants.getSimpleStoreDefinitionsXml()));
-                    StoreDefinition finalStoreDef = null;
-                    for(StoreDefinition storeDefinition: storeDefs) {
-                        if(storeDefinition.getName().equalsIgnoreCase("test-replication-memory")) {
-                            finalStoreDef = storeDefinition;
-                            break;
-                        }
-                    }
-                    String serializerInfoXml = CoordinatorUtils.constructSerializerInfoXml(finalStoreDef);
+
+                    String serializerInfoXml = "<store>\r\n  <name>test</name>\r\n  <key-serializer>\r\n    <type>string</type>\r\n  </key-serializer>\r\n  <value-serializer>\r\n    <type>string</type>\r\n  </value-serializer>\r\n</store>";
                     getSchemaExecutor.writeResponse(serializerInfoXml.getBytes("UTF-8"));
 
                 } else {

@@ -36,7 +36,9 @@ import voldemort.client.SocketStoreClientFactory;
 import voldemort.client.StoreClient;
 import voldemort.client.StoreClientFactory;
 import voldemort.client.protocol.RequestFormatType;
-import voldemort.restclient.RESTClient;
+import voldemort.coordinator.CoordinatorUtils;
+import voldemort.restclient.RESTClientConfig;
+import voldemort.restclient.RESTClientFactory;
 import voldemort.serialization.IdentitySerializer;
 import voldemort.serialization.Serializer;
 import voldemort.serialization.SerializerDefinition;
@@ -229,9 +231,10 @@ public class Benchmark {
                     }
                     opsDone++;
                 } catch(Exception e) {
-                    if(this.isVerbose)
-                        e.printStackTrace();
+                    // if(this.isVerbose)
+                    e.printStackTrace();
                     failureCount++;
+                    System.err.println("Increasing failure count " + failureCount);
                 }
 
                 if(targetThroughputPerMs > 0) {
@@ -258,6 +261,25 @@ public class Benchmark {
             }
         }
         return storeDef;
+    }
+
+    public String findKeyType(SerializerDefinition serializerDefinition) throws Exception {
+        if(serializerDefinition != null) {
+            if("string".equals(serializerDefinition.getName())) {
+                return Benchmark.STRING_KEY_TYPE;
+            } else if("json".equals(serializerDefinition.getName())) {
+                if(serializerDefinition.getCurrentSchemaInfo().contains("int")) {
+                    return Benchmark.JSONINT_KEY_TYPE;
+                } else if(serializerDefinition.getCurrentSchemaInfo().contains("string")) {
+                    return Benchmark.JSONSTRING_KEY_TYPE;
+                }
+            } else if("identity".equals(serializerDefinition.getName())) {
+                return Benchmark.IDENTITY_KEY_TYPE;
+            }
+        }
+
+        throw new Exception("Can't determine key type for key serializer "
+                            + serializerDefinition.getName());
     }
 
     public String findKeyType(StoreDefinition storeDefinition) throws Exception {
@@ -349,7 +371,16 @@ public class Benchmark {
             String socketUrl = "";
 
             if(bootstrapURL.contains("http")) {
-                this.storeClient = new RESTClient(bootstrapURL, "test");
+                // Create the client
+                RESTClientConfig config = new RESTClientConfig();
+                config.setHttpBootstrapURL(bootstrapURL)
+                      .setTimeoutMs(1500, TimeUnit.MILLISECONDS)
+                      .setMaxR2ConnectionPoolSize(5000);
+
+                RESTClientFactory factory = new RESTClientFactory(config);
+                this.storeClient = factory.getStoreClient("test");
+                this.factory = factory;
+
                 socketUrl = bootstrapURL.replace("http", "tcp");
                 socketUrl = socketUrl.replace("8080", "6666");
             } else {
@@ -369,7 +400,6 @@ public class Benchmark {
                                                                                 TimeUnit.MILLISECONDS)
                                                           .setRequestFormatType(RequestFormatType.VOLDEMORT_V3)
                                                           .setBootstrapUrls(socketUrl);
-            // .enableDefaultClient(true);
 
             if(clientZoneId >= 0) {
                 clientConfig.setClientZoneId(clientZoneId);
@@ -379,11 +409,22 @@ public class Benchmark {
 
             if(!bootstrapURL.contains("http")) {
                 this.storeClient = socketFactory.getStoreClient(storeName);
+
+                StoreDefinition storeDef = getStoreDefinition(socketFactory, storeName);
+                this.keyType = findKeyType(storeDef);
+                benchmarkProps.put(Benchmark.KEY_TYPE, this.keyType);
+                this.factory = socketFactory;
+            } else {
+
+                String serializerInfoXml = ((RESTClientFactory) factory).getSerializerInfo("test");
+                SerializerDefinition keySerializerDefinition = CoordinatorUtils.parseKeySerializerDefinition(serializerInfoXml);
+                SerializerDefinition valueSerializerDefinition = CoordinatorUtils.parseValueSerializerDefinition(serializerInfoXml);
+
+                System.err.println("Schema = " + serializerInfoXml);
+
+                this.keyType = findKeyType(keySerializerDefinition);
+                benchmarkProps.put(Benchmark.KEY_TYPE, this.keyType);
             }
-            StoreDefinition storeDef = getStoreDefinition(socketFactory, storeName);
-            this.keyType = findKeyType(storeDef);
-            benchmarkProps.put(Benchmark.KEY_TYPE, this.keyType);
-            this.factory = socketFactory;
 
         } else {
 

@@ -38,6 +38,7 @@ public class CoordinatorConfig {
     private volatile int nettyServerPort = 8080;
     private volatile int nettyServerBacklog = 1000;
     private volatile boolean noopEnabled = false;
+    private int noopSleepDelayInMs = 0;
 
     /* Propery names for propery-based configuration */
     public static final String BOOTSTRAP_URLS_PROPERTY = "bootstrap_urls";
@@ -46,6 +47,7 @@ public class CoordinatorConfig {
     public static final String NETTY_SERVER_PORT = "netty_server_port";
     public static final String NETTY_SERVER_BACKLOG = "netty_server_backlog";
     public static final String NOOP_ENABLED = "noop_enabled";
+    public static final String NOOP_SLEEP_DELAY = "noop_sleep_delay_in_ms";
 
     /**
      * Instantiate the coordinator config using a properties file
@@ -113,6 +115,10 @@ public class CoordinatorConfig {
 
         if(props.containsKey(NOOP_ENABLED)) {
             setNoopEnabled(props.getBoolean(NOOP_ENABLED, this.noopEnabled));
+        }
+
+        if(props.containsKey(NOOP_SLEEP_DELAY)) {
+            setNoopSleepDelayInMs(props.getInt(NOOP_SLEEP_DELAY, this.noopSleepDelayInMs));
         }
     }
 
@@ -195,6 +201,14 @@ public class CoordinatorConfig {
 
     public void setNoopEnabled(boolean noopEnabled) {
         this.noopEnabled = noopEnabled;
+    }
+
+    public int getNoopSleepDelayInMs() {
+        return noopSleepDelayInMs;
+    }
+
+    public void setNoopSleepDelayInMs(int noopSleepDelayInMs) {
+        this.noopSleepDelayInMs = noopSleepDelayInMs;
     }
 
 }

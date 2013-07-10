@@ -184,4 +184,12 @@ public class RESTClientFactory implements StoreClientFactory {
         return null;
     }
 
+    public String getSerializerInfo(String storeName) {
+        R2Store r2store = new R2Store(storeName,
+                                      this.config.getHttpBootstrapURL(),
+                                      this.transportClient,
+                                      this.config);
+        return r2store.getSerializerInfoXml();
+    }
+
 }
