@@ -73,6 +73,10 @@ public class FatClientWrapper {
 
         this.coordinatorConfig = config;
 
+        logger.info("Client for : " + storeName + ". Max Pool size = "
+                    + clientConfig.getFatClientWrapperMaxPoolSize() + " , Core Pool size = "
+                    + clientConfig.getFatClientWrapperCorePoolSize());
+
         // TODO: Import this from Config
         this.fatClientExecutor = new ThreadPoolExecutor(clientConfig.getFatClientWrapperCorePoolSize(),
                                                         clientConfig.getFatClientWrapperMaxPoolSize(),

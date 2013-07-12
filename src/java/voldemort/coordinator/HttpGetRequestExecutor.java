@@ -21,7 +21,6 @@ import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TRANS
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
 import static org.jboss.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
 import static org.jboss.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
-import static org.jboss.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
 import static org.jboss.netty.handler.codec.http.HttpResponseStatus.OK;
 import static org.jboss.netty.handler.codec.http.HttpResponseStatus.REQUEST_TIMEOUT;
 import static org.jboss.netty.handler.codec.http.HttpVersion.HTTP_1_1;
@@ -173,24 +172,33 @@ public class HttpGetRequestExecutor implements Runnable {
     @Override
     public void run() {
         try {
-            List<Versioned<byte[]>> versionedValues = storeClient.getWithCustomTimeout(this.getRequestObject);
-            if(versionedValues == null || versionedValues.size() == 0) {
-                if(this.getRequestObject.getValue() != null) {
-                    if(versionedValues == null) {
-                        versionedValues = new ArrayList<Versioned<byte[]>>();
-                    }
-                    versionedValues.add(this.getRequestObject.getValue());
+            // List<Versioned<byte[]>> versionedValues =
+            // storeClient.getWithCustomTimeout(this.getRequestObject);
+            // if(versionedValues == null || versionedValues.size() == 0) {
+            // if(this.getRequestObject.getValue() != null) {
+            // if(versionedValues == null) {
+            // versionedValues = new ArrayList<Versioned<byte[]>>();
+            // }
+            // versionedValues.add(this.getRequestObject.getValue());
+            //
+            // } else {
+            // RESTErrorHandler.handleError(NOT_FOUND,
+            // this.getRequestMessageEvent,
+            // "Requested Key does not exist");
+            // }
+            // if(logger.isDebugEnabled()) {
+            // logger.debug("GET successful !");
+            // }
+            // }
+            // writeResponse(versionedValues);
 
-                } else {
-                    RESTErrorHandler.handleError(NOT_FOUND,
-                                                 this.getRequestMessageEvent,
-                                                 "Requested Key does not exist");
-                }
-                if(logger.isDebugEnabled()) {
-                    logger.debug("GET successful !");
-                }
-            }
-            writeResponse(versionedValues);
+            Versioned<byte[]> responseVersioned = null;
+            byte[] sampleByteArray = "a".getBytes();
+            responseVersioned = new Versioned<byte[]>(sampleByteArray);
+            List<Versioned<byte[]>> responseList = new ArrayList<Versioned<byte[]>>();
+            responseList.add(responseVersioned);
+            writeResponse(responseList);
+
         } catch(IllegalArgumentException illegalArgsException) {
             String errorDescription = "PUT Failed !!! Illegal Arguments : "
                                       + illegalArgsException.getMessage();

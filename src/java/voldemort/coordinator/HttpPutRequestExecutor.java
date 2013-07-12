@@ -121,17 +121,21 @@ public class HttpPutRequestExecutor implements Runnable {
     public void run() {
 
         try {
-            VectorClock successfulPutVC = null;
-            if(putRequestObject.getValue() != null) {
-                successfulPutVC = ((VectorClock) this.storeClient.putVersionedWithCustomTimeout(putRequestObject)).clone();
-            } else {
-                successfulPutVC = ((VectorClock) this.storeClient.putWithCustomTimeout(putRequestObject)).clone();
-            }
 
-            if(logger.isDebugEnabled()) {
-                logger.debug("PUT successful !");
-            }
-            writeResponse(successfulPutVC);
+            // VectorClock successfulPutVC = null;
+            // if(putRequestObject.getValue() != null) {
+            // successfulPutVC = ((VectorClock)
+            // this.storeClient.putVersionedWithCustomTimeout(putRequestObject)).clone();
+            // } else {
+            // successfulPutVC = ((VectorClock)
+            // this.storeClient.putWithCustomTimeout(putRequestObject)).clone();
+            // }
+            //
+            // if(logger.isDebugEnabled()) {
+            // logger.debug("PUT successful !");
+            // }
+            // writeResponse(successfulPutVC);
+            writeResponse(new VectorClock());
 
         } catch(IllegalArgumentException illegalArgsException) {
             String errorDescription = "PUT Failed !!! Illegal Arguments : "

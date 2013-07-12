@@ -56,4 +56,4 @@ fi
 LOG4JPROPERTIES="-Dlog4j.configuration=file:///${base_dir}/src/java/log4j.properties"
 
 export CLASSPATH
-java $LOG4JPROPERTIES $VOLD_OPTS -cp $CLASSPATH $@
+java -Dcom.sun.management.jmxremote.port=7777 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false  $LOG4JPROPERTIES $VOLD_OPTS -cp $CLASSPATH $@
