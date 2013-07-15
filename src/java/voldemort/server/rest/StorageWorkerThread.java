@@ -2,6 +2,7 @@ package voldemort.server.rest;
 
 import static org.jboss.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -45,8 +46,22 @@ public class StorageWorkerThread implements Runnable {
                         logger.debug("Incoming get request");
                     }
                     try {
-                        List<Versioned<byte[]>> versionedValues = store.get(requestObject.getKey(),
-                                                                            null);
+
+                        // List<Versioned<byte[]>> versionedValues =
+                        // store.get(requestObject.getKey(),
+                        // null);
+                        //
+                        // if(versionedValues != null && versionedValues.size()
+                        // > 0) {
+                        // System.err.println("Received : " +
+                        // versionedValues.get(0));
+                        // }
+
+                        // Do a Noop here
+                        Versioned<byte[]> responseVersioned = new Versioned<byte[]>("My bullshit value".getBytes());
+                        List<Versioned<byte[]>> versionedValues = new ArrayList<Versioned<byte[]>>();
+                        versionedValues.add(responseVersioned);
+
                         // handle non existing key
                         if(versionedValues.size() > 0) {
                             GetResponseSender responseConstructor = new GetResponseSender(messageEvent,
@@ -55,7 +70,9 @@ public class StorageWorkerThread implements Runnable {
                                                                                           store.getName());
                             responseConstructor.sendResponse();
                         } else {
-                            logger.error("Error when doing get. Key does not exist");
+                            if(logger.isDebugEnabled()) {
+                                logger.debug("Error when doing get. Key does not exist");
+                            }
                             RestServerErrorHandler.writeErrorResponse(messageEvent,
                                                                       NOT_FOUND,
                                                                       "Key does not exist");
@@ -103,7 +120,11 @@ public class StorageWorkerThread implements Runnable {
                         logger.debug("Incoming put request");
                     }
                     try {
-                        store.put(requestObject.getKey(), requestObject.getValue(), null);
+                        // store.put(requestObject.getKey(),
+                        // requestObject.getValue(), null);
+
+                        // Do a noop here
+
                         PutResponseSender responseConstructor = new PutResponseSender(messageEvent);
                         responseConstructor.sendResponse();
                     } catch(Exception e) {

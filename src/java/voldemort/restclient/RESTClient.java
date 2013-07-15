@@ -28,6 +28,7 @@ import voldemort.cluster.Node;
 import voldemort.store.Store;
 import voldemort.versioning.InconsistentDataException;
 import voldemort.versioning.ObsoleteVersionException;
+import voldemort.versioning.VectorClock;
 import voldemort.versioning.Version;
 import voldemort.versioning.Versioned;
 
@@ -122,7 +123,17 @@ public class RESTClient<K, V> implements StoreClient<K, V> {
      */
     @Override
     public Version put(K key, V value) {
-        return put(key, new Versioned<V>(value));
+
+        VectorClock curVC = null;
+        Versioned<V> curValue = get(key);
+        if(curValue != null) {
+            curVC = (VectorClock) curValue.getVersion();
+            curVC = curVC.incremented(0, System.currentTimeMillis());
+        } else {
+            curVC = new VectorClock();
+            curVC = curVC.incremented(0, System.currentTimeMillis());
+        }
+        return put(key, new Versioned<V>(value, curVC));
     }
 
     @Override

@@ -36,7 +36,6 @@ import voldemort.client.SocketStoreClientFactory;
 import voldemort.client.StoreClient;
 import voldemort.client.StoreClientFactory;
 import voldemort.client.protocol.RequestFormatType;
-import voldemort.coordinator.CoordinatorUtils;
 import voldemort.restclient.RESTClientConfig;
 import voldemort.restclient.RESTClientFactory;
 import voldemort.serialization.IdentitySerializer;
@@ -416,11 +415,15 @@ public class Benchmark {
                 this.factory = socketFactory;
             } else {
 
-                String serializerInfoXml = ((RESTClientFactory) factory).getSerializerInfo("test");
-                SerializerDefinition keySerializerDefinition = CoordinatorUtils.parseKeySerializerDefinition(serializerInfoXml);
-                SerializerDefinition valueSerializerDefinition = CoordinatorUtils.parseValueSerializerDefinition(serializerInfoXml);
+                // String serializerInfoXml = ((RESTClientFactory)
+                // factory).getSerializerInfo("test");
+                // SerializerDefinition keySerializerDefinition =
+                // CoordinatorUtils.parseKeySerializerDefinition(serializerInfoXml);
+                // SerializerDefinition valueSerializerDefinition =
+                // CoordinatorUtils.parseValueSerializerDefinition(serializerInfoXml);
+                // System.err.println("Schema = " + serializerInfoXml);
 
-                System.err.println("Schema = " + serializerInfoXml);
+                SerializerDefinition keySerializerDefinition = new SerializerDefinition("string");
 
                 this.keyType = findKeyType(keySerializerDefinition);
                 benchmarkProps.put(Benchmark.KEY_TYPE, this.keyType);

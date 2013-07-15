@@ -379,15 +379,10 @@ public class R2Store extends AbstractStore<ByteArray, byte[], byte[]> {
             // If the given Vector clock is empty, we'll let the receiver of
             // this request fetch the existing vector clock and increment before
             // doing the put.
-            if(vc != null) {
-                String serializedVC = null;
-                if(!vc.getEntries().isEmpty()) {
-                    serializedVC = CoordinatorUtils.getSerializedVectorClock(vc);
-                }
-
-                if(serializedVC != null && serializedVC.length() > 0) {
-                    rb.setHeader(RestMessageHeaders.X_VOLD_VECTOR_CLOCK, serializedVC);
-                }
+            String serializedVC = null;
+            if(vc != null && !vc.getEntries().isEmpty()) {
+                serializedVC = CoordinatorUtils.getSerializedVectorClock(vc);
+                rb.setHeader(RestMessageHeaders.X_VOLD_VECTOR_CLOCK, serializedVC);
             }
 
             RestRequest request = rb.build();

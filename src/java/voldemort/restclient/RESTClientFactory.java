@@ -11,7 +11,6 @@ import org.apache.log4j.Logger;
 import voldemort.client.StoreClient;
 import voldemort.client.StoreClientFactory;
 import voldemort.cluster.failuredetector.FailureDetector;
-import voldemort.coordinator.CoordinatorUtils;
 import voldemort.serialization.DefaultSerializerFactory;
 import voldemort.serialization.Serializer;
 import voldemort.serialization.SerializerDefinition;
@@ -109,15 +108,26 @@ public class RESTClientFactory implements StoreClientFactory {
         // The lowest layer : Transporting request to coordinator
         R2Store r2store = new R2Store(storeName,
                                       this.config.getHttpBootstrapURL(),
+                                      "2",
                                       this.transportClient,
                                       this.config);
+        // R2Store r2store = new R2Store(storeName,
+        // this.config.getHttpBootstrapURL(),
+        // this.transportClient,
+        // this.config);
+
         this.rawStoreList.add(r2store);
 
         // bootstrap from the coordinator and obtain all the serialization
         // information.
-        String serializerInfoXml = r2store.getSerializerInfoXml();
-        SerializerDefinition keySerializerDefinition = CoordinatorUtils.parseKeySerializerDefinition(serializerInfoXml);
-        SerializerDefinition valueSerializerDefinition = CoordinatorUtils.parseValueSerializerDefinition(serializerInfoXml);
+        // String serializerInfoXml = r2store.getSerializerInfoXml();
+        // SerializerDefinition keySerializerDefinition =
+        // CoordinatorUtils.parseKeySerializerDefinition(serializerInfoXml);
+        // SerializerDefinition valueSerializerDefinition =
+        // CoordinatorUtils.parseValueSerializerDefinition(serializerInfoXml);
+
+        SerializerDefinition keySerializerDefinition = new SerializerDefinition("string");
+        SerializerDefinition valueSerializerDefinition = new SerializerDefinition("string");
 
         if(logger.isDebugEnabled()) {
             logger.debug("Bootstrapping for " + storeName + ": Key serializer "
