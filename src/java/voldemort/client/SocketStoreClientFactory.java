@@ -107,10 +107,10 @@ public class SocketStoreClientFactory extends AbstractStoreClientFactory {
     }
 
     @Override
-    protected Store<ByteArray, byte[], byte[]> getStore(String storeName,
-                                                        String host,
-                                                        int port,
-                                                        RequestFormatType type) {
+    public Store<ByteArray, byte[], byte[]> getStore(String storeName,
+                                                     String host,
+                                                     int port,
+                                                     RequestFormatType type) {
         return storeFactory.create(storeName, host, port, type, requestRoutingType);
     }
 
