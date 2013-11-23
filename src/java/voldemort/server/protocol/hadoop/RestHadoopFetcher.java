@@ -19,13 +19,18 @@ package voldemort.server.protocol.hadoop;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.management.ObjectName;
@@ -37,12 +42,15 @@ import org.apache.log4j.Logger;
 
 import voldemort.VoldemortException;
 import voldemort.annotations.jmx.JmxGetter;
+import voldemort.server.StoreRepository;
 import voldemort.server.VoldemortConfig;
 import voldemort.server.protocol.admin.AsyncOperationStatus;
+import voldemort.store.Store;
 import voldemort.store.readonly.FileFetcher;
 import voldemort.store.readonly.ReadOnlyStorageMetadata;
 import voldemort.store.readonly.checksum.CheckSum;
 import voldemort.store.readonly.checksum.CheckSum.CheckSumType;
+import voldemort.utils.ByteArray;
 import voldemort.utils.ByteUtils;
 import voldemort.utils.DynamicEventThrottler;
 import voldemort.utils.DynamicThrottleLimit;
@@ -50,6 +58,8 @@ import voldemort.utils.EventThrottler;
 import voldemort.utils.JmxUtils;
 import voldemort.utils.Time;
 import voldemort.utils.Utils;
+import voldemort.versioning.VectorClock;
+import voldemort.versioning.Versioned;
 
 import com.linkedin.tusk.RestFSException;
 import com.linkedin.tusk.RestFileStatus;
@@ -68,6 +78,7 @@ public class RestHadoopFetcher implements FileFetcher {
     private long minBytesPerSecond = 0;
     private long retryDelayMs = 0;
     private int maxAttempts = 0;
+    private StoreRepository storeRepository;
 
     public RestHadoopFetcher(VoldemortConfig config) {
         this(null,
@@ -82,7 +93,9 @@ public class RestHadoopFetcher implements FileFetcher {
                     + bufferSize + ", reporting interval bytes " + reportingIntervalBytes);
     }
 
-    public RestHadoopFetcher(VoldemortConfig config, DynamicThrottleLimit dynThrottleLimit) {
+    public RestHadoopFetcher(VoldemortConfig config,
+                             DynamicThrottleLimit dynThrottleLimit,
+                             StoreRepository storeRepository) {
         this(dynThrottleLimit,
              null,
              config.getReadOnlyFetcherReportingIntervalBytes(),
@@ -91,6 +104,8 @@ public class RestHadoopFetcher implements FileFetcher {
              config.getReadOnlyFetchRetryCount(),
              config.getReadOnlyFetchRetryDelayMs());
 
+        this.storeRepository = storeRepository;
+        logger.info("Got storage repository: " + this.storeRepository.toString());
         logger.info("Created Rest-based hdfs fetcher with throttle rate "
                     + dynThrottleLimit.getRate() + ", buffer size " + bufferSize
                     + ", reporting interval bytes " + reportingIntervalBytes);
@@ -347,6 +362,83 @@ public class RestHadoopFetcher implements FileFetcher {
         return fileCheckSumGenerator;
     }
 
+    private void parseDataFile(File copyLocation) {
+
+        FileChannel dataFileChannel;
+        try {
+            dataFileChannel = new FileInputStream(copyLocation).getChannel();
+        } catch(FileNotFoundException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+            return;
+        }
+
+        // Buffer for 'numKeyValues', 'keySize' and 'valueSize'
+        ByteBuffer numKeysBuffer = ByteBuffer.allocate(ByteUtils.SIZE_OF_SHORT);
+        int headerSize = 2 * ByteUtils.SIZE_OF_INT;
+        ByteBuffer keyValueMetadataBuffer = ByteBuffer.allocate(headerSize);
+
+        Store<ByteArray, byte[], byte[]> store = this.storeRepository.getLocalStore("test-rw-ro");
+
+        while(true) {
+            try {
+                int bytesRead = dataFileChannel.read(numKeysBuffer);
+
+                // If end of data file, break
+                if(bytesRead <= 0) {
+                    break;
+                }
+                // Read the number of key-values
+                short numKeyValues = numKeysBuffer.getShort(0);
+
+                for(int index = 0; index < numKeyValues; index++) {
+
+                    // Read the key size and value size metadata
+                    dataFileChannel.read(keyValueMetadataBuffer);
+
+                    // Read the key size
+                    int keySize = keyValueMetadataBuffer.getInt(0);
+
+                    // Read the value size
+                    int valueSize = keyValueMetadataBuffer.getInt(ByteUtils.SIZE_OF_INT);
+
+                    // Read key
+                    ByteBuffer keyBuffer = ByteBuffer.allocate(keySize);
+                    dataFileChannel.read(keyBuffer);
+
+                    // Read value
+                    ByteBuffer valueBuffer = ByteBuffer.allocate(valueSize);
+                    dataFileChannel.read(valueBuffer);
+
+                    // Insert in the read-write store
+                    System.out.println("Writing to Voldemort RW store: " + keyBuffer.array());
+                    ByteArray keyByteArray = new ByteArray(keyBuffer.array());
+                    List<Versioned<byte[]>> currentValueList = store.get(keyByteArray, null);
+                    Versioned<byte[]> newValue = null;
+                    if(currentValueList == null || currentValueList.size() == 0) {
+                        newValue = new Versioned<byte[]>(valueBuffer.array());
+                    } else {
+                        Versioned<byte[]> currentValue = currentValueList.get(0);
+                        VectorClock clock = (VectorClock) currentValue.getVersion();
+                        clock.incrementVersion(0, System.currentTimeMillis());
+                        newValue = new Versioned<byte[]>(valueBuffer.array(), clock);
+                    }
+
+                    store.put(keyByteArray, newValue, null);
+
+                    // Clear the buffer
+                    keyValueMetadataBuffer.clear();
+                }
+            } catch(IOException ioe) {
+                ioe.printStackTrace();
+                System.err.println("Error while parsing data file: " + ioe);
+            } catch(Exception e) {
+                System.err.println("Error while writing to local store.");
+                e.printStackTrace();
+            }
+        }
+    }
+
     private boolean fetch(RestFileSystem rfs, String source, File dest, CopyStats stats)
             throws Throwable, RestFSException {
         boolean fetchSucceed = false;
@@ -433,6 +525,11 @@ public class RestHadoopFetcher implements FileFetcher {
                                              + new String(Hex.encodeHex(checkSum)));
                             }
                             checkSumGenerator.update(checkSum);
+                        }
+
+                        // Parse the data file here
+                        if(shortFileName.contains("data")) {
+                            parseDataFile(copyLocation);
                         }
                     }
 

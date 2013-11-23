@@ -133,10 +133,12 @@ public class AdminServiceRequestHandler implements RequestHandler {
                                                                                   new Class<?>[] {
                                                                                           VoldemortConfig.class,
                                                                                           storageService.getDynThrottleLimit()
-                                                                                                        .getClass() },
+                                                                                                        .getClass(),
+                                                                                          StoreRepository.class },
                                                                                   new Object[] {
                                                                                           voldemortConfig,
-                                                                                          storageService.getDynThrottleLimit() });
+                                                                                          storageService.getDynThrottleLimit(),
+                                                                                          this.storeRepository });
                 } catch(Exception e) {
                     throw new VoldemortException("Error loading file fetcher class " + className, e);
                 }
