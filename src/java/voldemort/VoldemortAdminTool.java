@@ -36,8 +36,15 @@ import java.io.PrintStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -45,6 +52,7 @@ import joptsimple.OptionSet;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.JsonDecoder;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.io.FileUtils;
@@ -1633,7 +1641,7 @@ public class VoldemortAdminTool {
                                         String keyString,
                                         boolean useAscii) throws IOException {
         List<StoreDefinition> storeDefinitionList = adminClient.metadataMgmtOps.getRemoteStoreDefList(nodeId)
-                .getValue();
+                                                                               .getValue();
         Map<String, StoreDefinition> storeDefinitions = new HashMap<String, StoreDefinition>();
         for(StoreDefinition storeDef: storeDefinitionList) {
             storeDefinitions.put(storeDef.getName(), storeDef);
@@ -1651,7 +1659,8 @@ public class VoldemortAdminTool {
             @SuppressWarnings("unchecked")
             final Serializer<Object> valueSerializer = (Serializer<Object>) serializerFactory.getSerializer(valueSerializerDef);
 
-            // although the streamingOps support multiple keys, we only query on key here
+            // although the streamingOps support multiple keys, we only query on
+            // key here
             List<ByteArray> listKeys = new ArrayList<ByteArray>();
             try {
                 if(useAscii) {
@@ -1659,10 +1668,11 @@ public class VoldemortAdminTool {
                     String keySerializerName = keySerializerDef.getName();
                     if(isAvroSchema(keySerializerName)) {
                         Schema keySchema = Schema.parse(keySerializerDef.getCurrentSchemaInfo());
-                        JsonDecoder decoder = new JsonDecoder(keySchema, keyString);
+                        DecoderFactory decoderFactory = new DecoderFactory();
+                        JsonDecoder decoder = decoderFactory.jsonDecoder(keySchema, keyString);
                         GenericDatumReader<Object> datumReader = new GenericDatumReader<Object>(keySchema);
                         keyObject = datumReader.read(null, decoder);
-                    } else if (keySerializerName.equals(DefaultSerializerFactory.JSON_SERIALIZER_TYPE_NAME)){
+                    } else if(keySerializerName.equals(DefaultSerializerFactory.JSON_SERIALIZER_TYPE_NAME)) {
                         JsonReader jsonReader = new JsonReader(new StringReader(keyString));
                         keyObject = jsonReader.read();
                     } else {
@@ -1715,7 +1725,6 @@ public class VoldemortAdminTool {
                         Object keyObject = keySerializer.toObject((null == keyCompressionStrategy) ? keyBytes
                                                                                                   : keyCompressionStrategy.inflate(keyBytes));
 
-
                         // iterate through, unserialize and write values
                         if(queryKeyResult.hasValues() && queryKeyResult.getValues().size() > 0) {
                             for(Versioned<byte[]> versioned: queryKeyResult.getValues()) {
@@ -1728,11 +1737,12 @@ public class VoldemortAdminTool {
                                 }
                                 // write version
                                 VectorClock version = (VectorClock) versioned.getVersion();
-                                out.write(' ' + version.toString() + '[' + new Date(version.getTimestamp()).toString() + ']');
+                                out.write(' ' + version.toString() + '['
+                                          + new Date(version.getTimestamp()).toString() + ']');
                                 // write value
                                 byte[] valueBytes = versioned.getValue();
                                 Object valueObject = valueSerializer.toObject((null == valueCompressionStrategy) ? valueBytes
-                                        : valueCompressionStrategy.inflate(valueBytes));
+                                                                                                                : valueCompressionStrategy.inflate(valueBytes));
                                 if(valueObject instanceof GenericRecord) {
                                     out.write(valueObject.toString());
                                 } else {
@@ -1763,9 +1773,9 @@ public class VoldemortAdminTool {
 
     private static boolean isAvroSchema(String serializerName) {
         if(serializerName.equals(DefaultSerializerFactory.AVRO_GENERIC_VERSIONED_TYPE_NAME)
-                || serializerName.equals(DefaultSerializerFactory.AVRO_GENERIC_TYPE_NAME)
-                || serializerName.equals(DefaultSerializerFactory.AVRO_REFLECTIVE_TYPE_NAME)
-                || serializerName.equals(DefaultSerializerFactory.AVRO_SPECIFIC_TYPE_NAME)) {
+           || serializerName.equals(DefaultSerializerFactory.AVRO_GENERIC_TYPE_NAME)
+           || serializerName.equals(DefaultSerializerFactory.AVRO_REFLECTIVE_TYPE_NAME)
+           || serializerName.equals(DefaultSerializerFactory.AVRO_SPECIFIC_TYPE_NAME)) {
             return true;
         } else {
             return false;

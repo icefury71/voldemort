@@ -50,7 +50,7 @@
 	<classpathentry kind="lib" path="contrib/krati/lib/krati-0.3.6.jar"/>
 	<classpathentry kind="lib" path="lib/jna.jar"/>
 	<classpathentry kind="lib" path="lib/mockito-all-1.8.5.jar"/>
-	<classpathentry kind="lib" path="lib/avro-1.4.0.jar"/>
+	<classpathentry kind="lib" path="lib/avro-1.7.5.jar"/>
 	<classpathentry kind="lib" path="lib/libthrift-0.5.0.jar"/>
 	<classpathentry kind="lib" path="lib/compress-lzf-0.9.1.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-0.2.jar"/>
@@ -66,6 +66,7 @@
 	<classpathentry kind="lib" path="lib/guava-14.0.1.jar"/>
 	<classpathentry kind="lib" path="lib/gson-2.2.4.jar"/>
 	<classpathentry kind="lib" path="lib/tusk-0.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="lib/avro-tools-1.7.5.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="output" path="classes"/>
 </classpath>

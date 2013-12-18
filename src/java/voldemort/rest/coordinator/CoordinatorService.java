@@ -36,6 +36,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.JsonDecoder;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.io.IOUtils;
@@ -246,7 +247,8 @@ public class CoordinatorService extends AbstractService {
                          .join(IOUtils.readLines(new FileReader(new File(configFilePath))))
                          .trim();
 
-            JsonDecoder decoder = new JsonDecoder(CLIENT_CONFIGS_AVRO_SCHEMA, line);
+            DecoderFactory decoderFactory = new DecoderFactory();
+            JsonDecoder decoder = decoderFactory.jsonDecoder(CLIENT_CONFIGS_AVRO_SCHEMA, line);
             GenericDatumReader<Object> datumReader = new GenericDatumReader<Object>(CLIENT_CONFIGS_AVRO_SCHEMA);
             GenericData.Array<Map<Utf8, Utf8>> flowMaps = (GenericData.Array<Map<Utf8, Utf8>>) datumReader.read(null,
                                                                                                                 decoder);

@@ -8,6 +8,7 @@ import java.util.List;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.JsonDecoder;
 
 import voldemort.client.ClientConfig;
@@ -145,7 +146,8 @@ public class VoldemortAvroClientShell {
                     System.out.println("Enter key:");
                     line = reader.readLine();
 
-                    JsonDecoder decoder = new JsonDecoder(keySchema, line);
+                    DecoderFactory decoderFactory = new DecoderFactory();
+                    JsonDecoder decoder = decoderFactory.jsonDecoder(keySchema, line);
                     GenericDatumReader<Object> datumReader = null;
                     Object key = null;
                     try {
@@ -171,8 +173,9 @@ public class VoldemortAvroClientShell {
                     line = reader.readLine();
                     valueString = line;
 
-                    JsonDecoder keyDecoder = new JsonDecoder(keySchema, keyString);
-                    JsonDecoder valueDecoder = new JsonDecoder(valueSchema, valueString);
+                    DecoderFactory decoderFactory = new DecoderFactory();
+                    JsonDecoder keyDecoder = decoderFactory.jsonDecoder(keySchema, keyString);
+                    JsonDecoder valueDecoder = decoderFactory.jsonDecoder(valueSchema, valueString);
 
                     GenericDatumReader<Object> datumReader = null;
                     Object key = null;
